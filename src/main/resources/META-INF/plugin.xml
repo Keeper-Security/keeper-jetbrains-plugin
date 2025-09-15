@@ -1,0 +1,109 @@
+<idea-plugin>
+    <id>com.keepersecurity.jetbrains</id>
+    <name>Keeper Vault JetBrains Plugin</name>
+    <vendor>JetBrains</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <resource-bundle>messages.KeeperSecurity</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Register KeeperVaultService -->
+        <projectService serviceImplementation="keepersecurity.action.KeeperVaultService"/>
+
+        <!-- Add these new ones -->
+        <applicationService serviceImplementation="keepersecurity.service.KeeperPluginService"/>
+        
+        <!-- Startup activities -->
+        <postStartupActivity implementation="keepersecurity.service.KeeperStartupActivity" />
+    </extensions>
+
+    <actions>
+        <!-- Keeper Vault group in Tools menu -->
+        <group id="KeeperVaultGroup" text="Keeper Vault" description="Keeper Vault actions">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            
+            <!-- Authorization check action -->
+            <action id="keepersecurity.action.KeeperAuthAction"
+                    class="keepersecurity.action.KeeperAuthAction"
+                    text="Check Keeper Authorization"
+                    description="Check if Keeper CLI is installed and you're logged in"/>
+                    
+            <!-- Secret retrieval action -->
+            <action id="keepersecurity.action.KeeperSecretAction"
+                    class="keepersecurity.action.KeeperSecretAction"
+                    text="Run Keeper Securely"
+                    description="Replace Keeper references with actual secret values"/>
+                    
+            <!-- Add Keeper Record action -->
+            <action id="keepersecurity.action.KeeperRecordAddAction"
+                    class="keepersecurity.action.KeeperRecordAddAction"
+                    text="Add Keeper Record"
+                    description="Create a new Keeper Vault record and replace the selected variable with its reference"/>
+                    
+            <!-- Update Keeper Record action -->
+            <action id="keepersecurity.action.KeeperRecordUpdateAction"
+                    class="keepersecurity.action.KeeperRecordUpdateAction"
+                    text="Update Keeper Record"
+                    description="Update an existing Keeper Vault record and replace the selected variable with its updated reference"/>
+
+            <action id="keepersecurity.action.KeeperFolderSelectActionEditor"
+                    class="keepersecurity.action.KeeperFolderSelectAction"
+                    text="Get Keeper Folder"
+                    description="Get folder UUID from Keeper Vault"/>
+
+            <action id="keepersecurity.action.KeeperGetSecretAction"
+                class="keepersecurity.action.KeeperGetSecretAction"
+                text="Get Keeper Secret"
+                description="Choose a Keeper record and insert its field reference into the editor"/>
+
+            <!-- Generate Keeper Secrets action -->
+            <action id="keepersecurity.action.KeeperGenerateSecretsAction"
+                class="keepersecurity.action.KeeperGenerateSecretsAction"
+                text="Generate Keeper Secret"
+                description="Generate a strong password and create a new Keeper Vault record"/>
+        </group>
+        
+        <!-- Right-click editor popup menu -->
+        <group id="KeeperVaultEditorGroup">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <separator/>
+
+            <action id="keepersecurity.action.KeeperAuthActionEditor"
+                    class="keepersecurity.action.KeeperAuthAction"
+                    text="Check Keeper Auth"
+                    description="Check Keeper authorization"/>
+                    
+            <action id="keepersecurity.action.KeeperSecretActionEditor"
+                    class="keepersecurity.action.KeeperSecretAction"
+                    text="Run Keeper Securely"
+                    description="Get secrets from Keeper"/>
+                    
+            <action id="keepersecurity.action.KeeperRecordAddActionEditor"
+                    class="keepersecurity.action.KeeperRecordAddAction"
+                    text="Add Keeper Record"
+                    description="Create and insert Keeper record reference"/>
+                    
+            <action id="keepersecurity.action.KeeperRecordUpdateActionEditor"
+                    class="keepersecurity.action.KeeperRecordUpdateAction"
+                    text="Update Keeper Record"
+                    description="Update an existing Keeper Vault record and replace the selected variable with its reference"/>
+
+            <action id="keepersecurity.action.KeeperFolderSelectAction"
+                    class="keepersecurity.action.KeeperFolderSelectAction"
+                    text="Get Keeper Folder"
+                    description="Select a Keeper folder and save its UUID"/>
+
+            <action id="keepersecurity.action.KeeperGetSecretActionEditor"
+                class="keepersecurity.action.KeeperGetSecretAction"
+                text="Get Keeper Secret"
+                description="Choose a Keeper record and insert its field reference"/>
+
+            <!-- Generate Keeper Secrets action (Editor popup) -->
+            <action id="keepersecurity.action.KeeperGenerateSecretsActionEditor"
+                class="keepersecurity.action.KeeperGenerateSecretsAction"
+                text="Generate Keeper Secret"
+                description="Generate a strong password and create a new Keeper Vault record"/>
+        </group>
+    </actions>
+</idea-plugin>

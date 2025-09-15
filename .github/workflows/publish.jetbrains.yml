@@ -1,0 +1,222 @@
+name: Build & Publish Keeper Security JetBrains Plugin
+'on':
+  workflow_dispatch: null
+jobs:
+  test:
+    runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          java-version: [21]
+
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - name: Setup Java ${{ matrix.java-version }}
+          uses: actions/setup-java@v4
+          with:
+            java-version: ${{ matrix.java-version }}
+            distribution: 'zulu'
+
+        - name: Setup Gradle
+          uses: gradle/actions/setup-gradle@v4
+
+        - name: Run tests
+          run: ./gradlew test
+
+        - name: Run verification
+          run: ./gradlew check
+  build-plugin:
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin
+
+      - name: Verify plugin
+        run: ./gradlew verifyPlugin
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-build
+          path: "build/distributions/*.zip"
+          retention-days: 30
+  generate-sbom:
+    runs-on: ubuntu-latest
+    needs:
+      - build-plugin
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+      - name: Install Syft
+        run: >
+          echo "Installing Syft v1.18.1..."
+
+          curl -sSfL
+          https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s
+          -- -b /tmp/bin v1.18.1
+
+          echo "/tmp/bin" >> $GITHUB_PATH
+      - name: Install Manifest CLI
+        run: >
+          echo "Installing Manifest CLI v0.18.3..."
+
+          curl -sSfL
+          https://raw.githubusercontent.com/manifest-cyber/cli/main/install.sh |
+          sh -s -- -b /tmp/bin v0.18.3
+      - name: Create Syft configuration
+        run: |
+          cat > syft-config.yaml << 'EOF'
+          package:
+            search:
+              scope: all-layers
+              exclude:
+                - "**/test/**"
+                - "**/examples/**"
+            cataloger:
+              enabled: true
+              java:
+                enabled: true
+                search-jar: true
+              nodejs:
+                enabled: false
+              python:
+                enabled: false
+              ruby:
+                enabled: false
+          EOF
+      - name: Generate and upload SBOM
+        env:
+          MANIFEST_API_KEY: '${{ secrets.MANIFEST_TOKEN }}'
+        run: >
+          echo "Detecting JetBrains plugin version..."
+
+          VERSION=$(./gradlew properties -q | grep "^version:" | awk '{print
+          $2}')
+
+          if [ -z "$VERSION" ]; then
+            VERSION="0.0.1"
+            echo "Could not detect version, using default: ${VERSION}"
+          else
+            echo "Detected version: ${VERSION}"
+          fi
+
+
+          echo "Generating SBOM with Manifest CLI..."
+
+          /tmp/bin/manifest sbom "." \
+            --generator=syft \
+            --name=keeper-security-jetbrains-plugin \
+            --version=${VERSION} \
+            --output=spdx-json \
+            --file=jetbrains-plugin-sbom.json \
+            --api-key=${MANIFEST_API_KEY} \
+            --publish=true \
+            --asset-label=application,sbom-generated,java,jetbrains-plugin \
+            --generator-config=syft-config.yaml
+
+          echo "SBOM generated and uploaded successfully:
+          jetbrains-plugin-sbom.json"
+
+          head -n 20 jetbrains-plugin-sbom.json
+  publish-marketplace:
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 20
+    needs:
+      - test
+      - build-plugin
+      - generate-sbom
+    steps:
+      - name: Checkout Source 
+        uses: actions/checkout@v4
+      - name: Setup Java 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: temurin
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: jetbrains-plugin-build
+          path: ./artifacts
+      - name: Retrieve Marketplace Token from Keeper Secrets Manager
+        id: ksmsecrets
+        uses: Keeper-Security/ksm-action@master
+        with:
+          keeper-secret-config: '${{ secrets.KSM_KSM_CONFIG }}'
+          secrets: |
+            <record-uid>/field/password > MARKETPLACE_TOKEN
+      - name: Detect Plugin Version
+        id: version
+        run: >
+          VERSION=$(./gradlew properties -q | grep "^version:" | awk '{print
+          $2}')
+
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not detect plugin version from Gradle"
+            exit 1
+          fi
+
+          echo "plugin_version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Check if version already exists on JetBrains Marketplace
+        id: check-version
+        env:
+          VERSION: '${{ steps.version.outputs.plugin_version }}'
+          PUBLISH_TOKEN: '${{ steps.ksmsecrets.outputs.MARKETPLACE_TOKEN }}'
+        run: |
+          echo "Checking if version $VERSION already exists..."
+          PLUGIN_ID="<plugin-id>"  # Replace with your actual plugin ID
+
+          RESPONSE=$(curl -s -H "Authorization: Bearer $PUBLISH_TOKEN" \
+            "https://plugins.jetbrains.com/api/plugins/$PLUGIN_ID/updates")
+
+          if echo "$RESPONSE" | grep -q "\"version\":\"$VERSION\""; then
+            echo "Version $VERSION already exists on JetBrains Marketplace. Skipping publish."
+            exit 0
+          else
+            echo "Version $VERSION not found. Proceeding with publish."
+          fi
+      - name: Publish to JetBrains Marketplace
+        if: success() && steps.check-version.outcome == 'success'
+        env:
+          PUBLISH_TOKEN: '${{ steps.ksmsecrets.outputs.MARKETPLACE_TOKEN }}'
+        run: >
+          echo "Publishing Keeper Security JetBrains Plugin v${{
+          steps.version.outputs.plugin_version }}..."
+
+          ./gradlew publishPlugin -Pintellij.publish.token=$PUBLISH_TOKEN
+      - name: Create Release Summary
+        if: success() && steps.check-version.outcome == 'success'
+        env:
+          VERSION: '${{ steps.version.outputs.plugin_version }}'
+        run: >
+          echo "## JetBrains Plugin Published Successfully!" >>
+          $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "**Plugin:** Keeper Security JetBrains Plugin" >>
+          $GITHUB_STEP_SUMMARY
+
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+
+          echo "**Marketplace:**
+          https://plugins.jetbrains.com/plugin/<plugin-id>" >>
+          $GITHUB_STEP_SUMMARY
