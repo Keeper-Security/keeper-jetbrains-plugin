@@ -14,25 +14,28 @@ object KeeperJsonUtils {
     fun extractJsonFromOutput(output: String, expectedType: String, logger: Logger? = null): String {
         logger?.debug("🔍 Searching for JSON $expectedType in output (${output.length} chars)")
         logger?.debug("Raw output preview: ${output.take(300)}...")
-        
+
+        // Sanitize output: strip ANSI/color sequences, carriage returns, and non-printables
+        val sanitized = stripAnsi(output)
+
         try {
             // Strategy 1: Find the JSON by looking for the pattern after common Keeper CLI text
-            val cleanedJson = findJsonAfterKeeperText(output, expectedType, logger)
+            val cleanedJson = findJsonAfterKeeperText(sanitized, expectedType, logger)
             if (cleanedJson != null) {
                 logger?.debug("Found JSON using Keeper text pattern")
                 return cleanedJson
             }
-            
+
             // Strategy 2: Look for properly formed JSON arrays/objects in the text
-            val structuredJson = findStructuredJson(output, expectedType, logger)
+            val structuredJson = findStructuredJson(sanitized, expectedType, logger)
             if (structuredJson != null) {
                 logger?.debug("Found structured JSON")
                 return structuredJson
             }
-            
+
             // Strategy 3: Try to reconstruct JSON from individual objects
             if (expectedType == "array") {
-                val reconstructedJson = reconstructJsonArray(output, logger)
+                val reconstructedJson = reconstructJsonArray(sanitized, logger)
                 if (reconstructedJson != null) {
                     logger?.debug("Reconstructed JSON array from objects")
                     return reconstructedJson
@@ -233,5 +236,20 @@ object KeeperJsonUtils {
      */
     fun extractJsonObject(output: String, logger: Logger? = null): String {
         return extractJsonFromOutput(output, "object", logger)
+    }
+
+    // Strip ANSI escape sequences and common color remnants
+    private fun stripAnsi(text: String): String {
+        // Full ANSI escapes like ESC[31m, ESC[0m, etc.
+        val ansiRegex = Regex("\\u001B\\[[0-?]*[ -/]*[@-~]")
+        var cleaned = text.replace(ansiRegex, "")
+        // Remove stray color remnants like "[39m" that may appear if ESC was dropped
+        cleaned = cleaned.replace(Regex("\\[[0-9;]*m"), "")
+        // Normalize line endings and remove other control chars except newline/tab
+        cleaned = cleaned.replace("\r", "")
+        cleaned = cleaned.map { ch ->
+            if (ch < ' ' && ch != '\n' && ch != '\t') ' ' else ch
+        }.joinToString("")
+        return cleaned
     }
 }

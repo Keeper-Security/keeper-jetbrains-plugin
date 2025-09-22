@@ -87,7 +87,7 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
         // Execute the update in background using persistent shell
         object : Task.Backgroundable(project, "Updating Keeper Record...", false) {
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Using persistent Keeper shell..."
+                
                 
                 try {
                     val startTime = System.currentTimeMillis()
@@ -157,7 +157,7 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
                         }
                         Messages.showInfoMessage(
                             project, 
-                            "Keeper record updated!\n\n$keeperReference\n\nExecuted in persistent shell in ${duration}ms!", 
+                            "Keeper record updated!\n\n$keeperReference", 
                             "Keeper Record Updated"
                         )
                     }, ModalityState.defaultModalityState())

@@ -26,7 +26,7 @@ class KeeperFolderSelectAction : AnAction("Get Keeper Folder") {
 
         object : Task.Backgroundable(project, "Fetching Keeper Folders...", false) {
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Using persistent Keeper shell..."
+                
                 
                 val folderMap: List<Pair<String, String>> = try {
                     // This should be FAST after the first call!
@@ -75,7 +75,7 @@ class KeeperFolderSelectAction : AnAction("Get Keeper Folder") {
 
                         Messages.showInfoMessage(
                             project,
-                            "Folder '${selectedFolder.first}' with UUID '${selectedFolder.second}' has been saved.\nExecuted in persistent shell!",
+                            "Folder '${selectedFolder.first}' with UUID '${selectedFolder.second}' has been saved.",
                             "Folder Saved"
                         )
                     }

@@ -47,7 +47,7 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Generating Keeper Secret", false) {
             override fun run(indicator: ProgressIndicator) {
                 try {
-                    indicator.text = "Using persistent Keeper shell..."
+                    
                     
                     // Generate password using persistent shell
                     indicator.text = "Generating password..."
@@ -80,7 +80,7 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
                             }
                             Messages.showInfoMessage(
                                 project,
-                                "Keeper record created!\n\n$keeperReference\n\nGenerated via persistent shell in ${totalDuration}ms!",
+                                "Keeper record created!\n\n$keeperReference\n\nGenerated",
                                 "Keeper Secret Generated"
                             )
                         }

@@ -28,7 +28,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
 
         object : Task.Backgroundable(project, "Fetching Keeper Secrets...", false) {
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Using persistent Keeper shell..."
+                
 
                 // Step 1: Get list of records using persistent shell with retry logic
                 val startTime = System.currentTimeMillis()
@@ -169,7 +169,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                 // Show success message
                                 Messages.showInfoMessage(
                                     project,
-                                    "Keeper reference inserted!\n\n$keeperNotation\n\nExecuted via persistent shell!",
+                                    "Keeper reference inserted!\n\n$keeperNotation",
                                     "Keeper Reference Added"
                                 )
                             }

@@ -28,35 +28,68 @@ class KeeperAuthAction : AnAction("Check Keeper Authorization") {
                     logger.info("Starting Keeper authorization check")
                     diagnoseTTYAndInteractivity()
                     
-                    indicator.text = "Testing shell startup..."
-                    val isReady = KeeperShellService.isReady()
-                    
-                    if (!isReady) {
-                        indicator.text = "Attempting to start Keeper shell..."
-                        val started = KeeperShellService.startShell()
-                        
+                    indicator.text = "Starting/validating Keeper shell..."
+                    val wasReady = KeeperShellService.isReady()
+                    val started = if (!wasReady) KeeperShellService.startShell() else true
+                    if (!started) {
                         ApplicationManager.getApplication().invokeLater {
-                            if (started) {
-                                Messages.showInfoMessage(
-                                    project,
-                                    "Keeper shell started successfully!\nYou can now use other Keeper actions.",
-                                    "Authorization Check"
-                                )
+                            Messages.showErrorDialog(
+                                project,
+                                "Failed to start Keeper shell.\nPlease check that Keeper CLI is installed and you're authenticated.",
+                                "Authorization Failed"
+                            )
+                        }
+                        return
+                    }
+
+                    fun probe(timeout: Long): Pair<Boolean, String> {
+                        val output = try {
+                            try {
+                                KeeperShellService.executeCommand("", timeout)
+                            } catch (_: Exception) {
+                                KeeperShellService.executeCommand("this-device", timeout)
+                            }
+                        } catch (e: Exception) {
+                            return false to "Probe failed: ${e.message ?: "Unknown error"}"
+                        }
+                        val ok = output.contains("My Vault>", true) ||
+                                 output.contains("Keeper>", true) ||
+                                 output.contains("Status: SUCCESSFUL", true) ||
+                                 output.contains("Device Name:", true) ||
+                                 output.contains("Persistent Login: ON", true) ||
+                                 output.contains("record(s)", true) ||
+                                 (output.isNotBlank() && !output.contains("error", true) && !output.contains("failed", true))
+                        return ok to output
+                    }
+
+                    val (ok, out) = probe(if (wasReady) 15 else 45)
+                    if (ok) {
+                        val msg = if (out.contains("Successfully authenticated with Biometric Login", true)) {
+                            "Keeper shell is ready. Authentication passed using biometric."
+                        } else if (out.contains("Not logged in>", true)) {
+                            "Keeper shell is ready but not authenticated.\nPlease run 'keeper login' once to establish a persistent session."
+                        } else {
+                            "Keeper shell is ready."
+                        }
+                        ApplicationManager.getApplication().invokeLater {
+                            Messages.showInfoMessage(project, msg, "Authorization Check")
+                        }
+                        return
+                    }
+
+                    // Last fallback: gentle newline probe then report as before...
+                    try {
+                        val finalOut = KeeperShellService.executeCommand("", 10)
+                        ApplicationManager.getApplication().invokeLater {
+                            if (finalOut.contains(">") || finalOut.isBlank()) {
+                                Messages.showInfoMessage(project, "Keeper shell is responding. Authorization likely OK.", "Authorization Check")
                             } else {
-                                Messages.showErrorDialog(
-                                    project,
-                                    "Failed to start Keeper shell.\nPlease check that Keeper CLI is installed and you're authenticated.",
-                                    "Authorization Failed"
-                                )
+                                Messages.showErrorDialog(project, "Keeper shell did not report ready.\n$finalOut", "Authorization Possibly Not Ready")
                             }
                         }
-                    } else {
+                    } catch (_: Exception) {
                         ApplicationManager.getApplication().invokeLater {
-                            Messages.showInfoMessage(
-                                project,
-                                "Keeper shell is already running and ready!\nAll Keeper actions should work normally.",
-                                "Authorization OK"
-                            )
+                            Messages.showErrorDialog(project, "Unable to verify Keeper shell readiness.", "Authorization Failed")
                         }
                     }
                     
