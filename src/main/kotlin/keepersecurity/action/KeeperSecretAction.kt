@@ -12,7 +12,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 
-import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileCßhooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.vfs.VfsUtilCore
 
@@ -22,6 +22,14 @@ import javax.swing.JScrollPane
 import javax.swing.JTextArea
 import javax.swing.UIManager
 import kotlinx.serialization.ExperimentalSerializationApi
+
+// Added imports
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import keepersecurity.util.KeeperCommandUtils
+import keepersecurity.util.KeeperJsonUtils
+import keepersecurity.service.KeeperShellService
 
 @OptIn(ExperimentalSerializationApi::class)
 class KeeperSecretAction : AnAction("Run Keeper Securely") {
