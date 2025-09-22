@@ -152,17 +152,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: jetbrains-plugin-build
+          name: plugin-build
           path: ./artifacts
-      - name: Retrieve Marketplace Token from Keeper Secrets Manager
+      - name: Retrieve Secrets from Keeper Secrets Manager
         id: ksmsecrets
         uses: Keeper-Security/ksm-action@master
         with:
-          keeper-secret-config: '${{ secrets.KSM_KSM_CONFIG }}'
+          keeper-secret-config: '${{ secrets.KSM_JETBRAINS_CONFIG }}'
           secrets: |
-            <record-uid>/field/password > MARKETPLACE_TOKEN
+            ${{ secrets.KSM_JETBRAINS_PUBLISH_TOKEN_RECORD_UID }}/field/password > MARKETPLACE_TOKEN
+            ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/file/certificate_chain.crt > file:certificate_chain.crt
+            ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/file/private.pem > file:private.pem
+            ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/field/password > PRIVATE_KEY_PASSWORD
       - name: Detect Plugin Version
         id: version
         run: >
@@ -182,7 +185,7 @@ jobs:
           PUBLISH_TOKEN: '${{ steps.ksmsecrets.outputs.MARKETPLACE_TOKEN }}'
         run: |
           echo "Checking if version $VERSION already exists..."
-          PLUGIN_ID="<plugin-id>"  # Replace with your actual plugin ID
+          PLUGIN_ID="${{ secrets.JETBRAINS_PLUGIN_ID }}"
 
           RESPONSE=$(curl -s -H "Authorization: Bearer $PUBLISH_TOKEN" \
             "https://plugins.jetbrains.com/api/plugins/$PLUGIN_ID/updates")
@@ -197,6 +200,9 @@ jobs:
         if: success() && steps.check-version.outcome == 'success'
         env:
           PUBLISH_TOKEN: '${{ steps.ksmsecrets.outputs.MARKETPLACE_TOKEN }}'
+          CERTIFICATE_CHAIN: '${{ github.workspace }}/certificate_chain.crt'
+          PRIVATE_KEY: '${{ github.workspace }}/private.pem'
+          PRIVATE_KEY_PASSWORD: '${{ steps.ksmsecrets.outputs.PRIVATE_KEY_PASSWORD }}'
         run: >
           echo "Publishing Keeper Security JetBrains Plugin v${{
           steps.version.outputs.plugin_version }}..."
@@ -218,5 +224,5 @@ jobs:
           echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
 
           echo "**Marketplace:**
-          https://plugins.jetbrains.com/plugin/<plugin-id>" >>
+          https://plugins.jetbrains.com/plugin/${{ secrets.JETBRAINS_PLUGIN_ID }}" >>
           $GITHUB_STEP_SUMMARY
