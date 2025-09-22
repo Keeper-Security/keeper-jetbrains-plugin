@@ -113,7 +113,10 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            recommended()
+            ide(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
+            // Optionally verify against additional IDEs:
+            // ide("IC", "2024.3.6")
+            // ide("IU", "2024.3.6")
         }
     }
 }
