@@ -892,6 +892,7 @@ object KeeperShellService {
 
     private data class ExternalResult(val exitCode: Int, val output: String)
 
+    @Suppress("unused")
     private fun buildExternalKeeperCommand(vararg args: String): List<String> {
         return if (keeperIsModule) {
             // Example: "python3 -m keepercommander biometric --status"
@@ -904,6 +905,7 @@ object KeeperShellService {
         }
     }
 
+    @Suppress("unused")
     private fun runExternalKeeperCommand(args: List<String>, timeoutSeconds: Long = 15): ExternalResult {
         return try {
             val p = ProcessBuilder(args).redirectErrorStream(true).start()

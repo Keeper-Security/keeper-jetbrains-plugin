@@ -17,10 +17,8 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.vfs.VfsUtilCore
 
 import java.io.File
-import javax.swing.JFileChooser
 import javax.swing.JScrollPane
 import javax.swing.JTextArea
-import javax.swing.UIManager
 import kotlinx.serialization.ExperimentalSerializationApi
 
 // Added imports

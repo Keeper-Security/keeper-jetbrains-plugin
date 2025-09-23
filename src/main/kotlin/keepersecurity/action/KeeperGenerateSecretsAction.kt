@@ -13,7 +13,6 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ide.util.PropertiesComponent
-import keepersecurity.service.KeeperShellService
 import keepersecurity.util.KeeperCommandUtils
 import keepersecurity.util.KeeperJsonUtils
 import kotlinx.serialization.json.Json  
