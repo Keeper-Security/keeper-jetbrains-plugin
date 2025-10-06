@@ -52,7 +52,7 @@ class KeeperRecordAddAction : AnAction("Add Keeper Record") {
         // Run the record creation in background
         object : Task.Backgroundable(project, "Creating Keeper Record...", false) {
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Using persistent Keeper shell..."
+                
                 
                 try {
                     val startTime = System.currentTimeMillis()
@@ -76,7 +76,7 @@ class KeeperRecordAddAction : AnAction("Add Keeper Record") {
 
                         Messages.showInfoMessage(
                             project, 
-                            "Keeper record created!\n\n$keeperReference\n\nCreated via persistent shell in ${duration}ms!", 
+                            "Keeper record created!\n\n$keeperReference\n\nCreated", 
                             "Keeper Record Added"
                         )
                     }

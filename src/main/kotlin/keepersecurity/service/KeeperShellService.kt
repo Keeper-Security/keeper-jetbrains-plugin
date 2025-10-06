@@ -466,11 +466,17 @@ object KeeperShellService {
             }
             
             logger.info("Starting process: ${processBuilder.command().joinToString(" ")}")
-            
+
+            // Disable colorized output to avoid ANSI artifacts in parsed JSON
+            processBuilder.environment().apply {
+                put("NO_COLOR", "1")
+                put("CLICOLOR", "0")
+            }
+
             process = processBuilder
                 .redirectErrorStream(true)
                 .start()
-            
+
             writer = OutputStreamWriter(process!!.outputStream)
             reader = BufferedReader(InputStreamReader(process!!.inputStream))
             
@@ -484,10 +490,10 @@ object KeeperShellService {
             
             // Start the output reader thread
             startReaderThread()
-            
+
             // Wait for shell to be ready using OS-specific strategies
             val success = waitForShellInitialization()
-            
+
             if (success) {
                 shellReady.set(true)
                 logger.info("Keeper shell ready! Can now execute commands.")
@@ -609,6 +615,7 @@ object KeeperShellService {
             line.contains("Not logged in>") -> logger.warn("Shell ready but not authenticated: $line")
             line.contains("breachwatch") -> logger.debug("Info: $line")
             line.trim().isNotEmpty() -> logger.debug("Output: $line")
+            line.contains("Not logged in>") -> logger.warn("Shell ready but not authenticated")
         }
     }
     
@@ -616,6 +623,7 @@ object KeeperShellService {
         return text.contains("My Vault>") || 
                text.contains("Keeper>") ||
                text.contains("Not logged in>") ||
+               text.contains("Successfully authenticated with Biometric Login", ignoreCase = true) ||
                text.contains("Successfully authenticated") ||
                (text.contains("Decrypted") && text.contains("record(s)")) ||
                (text.contains("Successfully authenticated") && 
@@ -879,6 +887,39 @@ object KeeperShellService {
     fun getLastStartupOutput(): String {
         return bufferLock.withLock {
             outputBuffer.toString()
+        }
+    }
+
+    private data class ExternalResult(val exitCode: Int, val output: String)
+
+    @Suppress("unused")
+    private fun buildExternalKeeperCommand(vararg args: String): List<String> {
+        return if (keeperIsModule) {
+            // Example: "python3 -m keepercommander biometric --status"
+            val parts = keeperCliPath.split(" ").toMutableList()
+            parts.addAll(args)
+            parts
+        } else {
+            // Example: "/usr/local/bin/keeper biometric --status"
+            listOf(keeperCliPath) + args
+        }
+    }
+
+    @Suppress("unused")
+    private fun runExternalKeeperCommand(args: List<String>, timeoutSeconds: Long = 15): ExternalResult {
+        return try {
+            val p = ProcessBuilder(args).redirectErrorStream(true).start()
+            val completed = p.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            if (!completed) {
+                p.destroyForcibly()
+                ExternalResult(-1, "timeout")
+            } else {
+                val out = p.inputStream.bufferedReader().readText()
+                ExternalResult(p.exitValue(), out)
+            }
+        } catch (e: Exception) {
+            logger.debug("External command failed: ${e.message}")
+            ExternalResult(-1, "error: ${e.message}")
         }
     }
 }

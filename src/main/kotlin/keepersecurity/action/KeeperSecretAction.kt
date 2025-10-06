@@ -11,20 +11,23 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
-import keepersecurity.service.KeeperShellService
-import keepersecurity.util.KeeperJsonUtils
-import keepersecurity.util.KeeperCommandUtils
 
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.vfs.VfsUtilCore
+
+import java.io.File
+import javax.swing.JScrollPane
+import javax.swing.JTextArea
+import kotlinx.serialization.ExperimentalSerializationApi
+
+// Added imports
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-
-import java.io.File
-import javax.swing.JFileChooser
-import javax.swing.JScrollPane
-import javax.swing.JTextArea
-import javax.swing.UIManager
-import kotlinx.serialization.ExperimentalSerializationApi
+import keepersecurity.util.KeeperCommandUtils
+import keepersecurity.util.KeeperJsonUtils
+import keepersecurity.service.KeeperShellService
 
 @OptIn(ExperimentalSerializationApi::class)
 class KeeperSecretAction : AnAction("Run Keeper Securely") {
@@ -42,7 +45,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
         val document = editor.document
         val file = FileDocumentManager.getInstance().getFile(document) ?: return
 
-        val envFile = chooseEnvFile(file)
+        val envFile = chooseEnvFile(project, file)
         if (envFile == null || !envFile.exists()) {
             Messages.showErrorDialog(project, "No valid .env file selected.", "Error")
             return
@@ -86,7 +89,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
 
         object : Task.Backgroundable(project, "Fetching Keeper Secrets...", false) {
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Using persistent Keeper shell..."
+                
                 
                 // Check if Keeper shell is ready
                 if (!isKeeperReady()) {
@@ -134,13 +137,9 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
 
     // ... chooseEnvFile and browseForEnvFile methods remain the same ...
 
-    private fun chooseEnvFile(file: VirtualFile): File? {
+    private fun chooseEnvFile(project: Project, file: VirtualFile): File? {
         val defaultEnv = File(file.parent.path, ".env")
-        val options = if (defaultEnv.exists()) {
-            arrayOf(".env", "Browse")
-        } else {
-            arrayOf("Browse")
-        }
+        val options = if (defaultEnv.exists()) arrayOf(".env", "Browse") else arrayOf("Browse")
 
         val selectedOption = Messages.showEditableChooseDialog(
             "Select .env file:",
@@ -153,31 +152,26 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
 
         return when (selectedOption) {
             ".env" -> defaultEnv
-            "Browse" -> browseForEnvFile()
+            "Browse" -> browseForEnvFile(project)
             else -> null
         }
     }
 
-    private fun browseForEnvFile(): File? {
-        System.setProperty("apple.awt.fileDialogForDirectories", "false")
-        UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName())
-
-        val chooser = JFileChooser().apply {
-            dialogTitle = "Select .env File"
-            fileSelectionMode = JFileChooser.FILES_ONLY
-            isAcceptAllFileFilterUsed = false
-            fileFilter = javax.swing.filechooser.FileNameExtensionFilter("*.env", "env")
-            preferredSize = java.awt.Dimension(700, 500)
+    private fun browseForEnvFile(project: Project): File? {
+        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
+            title = "Select .env File"
+            withFileFilter { vf ->
+                val name = vf.name
+                name.equals(".env", true) || name.endsWith(".env", true) || name.substringAfterLast('.', "").equals("env", true)
+            }
         }
-
-        val result = chooser.showOpenDialog(null)
-        return if (result == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
+        val vFile = FileChooser.chooseFile(descriptor, project, null) ?: return null
+        return VfsUtilCore.virtualToIoFile(vFile)
     }
 
     private fun buildSuccessMessage(result: ProcessResult, duration: Long): String {
         return buildString {
             appendLine("Successfully injected ${result.replacements} secret(s)!")
-            appendLine("Completed in ${duration}ms using persistent shell!")
             appendLine("Script executed with latest saved changes!")
             if (result.errors.isNotEmpty()) {
                 appendLine()
