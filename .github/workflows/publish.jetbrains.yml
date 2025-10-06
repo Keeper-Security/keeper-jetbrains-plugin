@@ -1,31 +1,39 @@
 name: Build & Publish Keeper Security JetBrains Plugin
-'on':
-  workflow_dispatch: null
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to JetBrains Marketplace (uncheck to build only)'
+        required: false
+        default: true
+        type: boolean
+
 jobs:
   test:
     runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          java-version: [21]
+    strategy:
+      matrix:
+        java-version: [21]
 
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        - name: Setup Java ${{ matrix.java-version }}
-          uses: actions/setup-java@v4
-          with:
-            java-version: ${{ matrix.java-version }}
-            distribution: 'zulu'
+      - name: Setup Java ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'zulu'
 
-        - name: Setup Gradle
-          uses: gradle/actions/setup-gradle@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-        - name: Run tests
-          run: ./gradlew test
+      - name: Run tests
+        run: ./gradlew test
 
-        - name: Run verification
-          run: ./gradlew check
+      - name: Run verification
+        run: ./gradlew check
+
   build-plugin:
     runs-on: ubuntu-latest
     needs: [test]
@@ -197,7 +205,7 @@ jobs:
             echo "Version $VERSION not found. Proceeding with publish."
           fi
       - name: Publish to JetBrains Marketplace
-        if: success() && steps.check-version.outcome == 'success'
+        if: github.event.inputs.publish == 'true' && success() && steps.check-version.outcome == 'success'
         env:
           PUBLISH_TOKEN: '${{ steps.ksmsecrets.outputs.MARKETPLACE_TOKEN }}'
           CERTIFICATE_CHAIN: '${{ github.workspace }}/certificate_chain.crt'
@@ -208,8 +216,14 @@ jobs:
           steps.version.outputs.plugin_version }}..."
 
           ./gradlew publishPlugin -Pintellij.publish.token=$PUBLISH_TOKEN
+      - name: Upload plugin artifact for testing
+        if: ${{ github.event.inputs.publish == 'false' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jetbrains-plugin-${{ github.run_number }}
+          path: ./artifacts/*.zip
       - name: Create Release Summary
-        if: success() && steps.check-version.outcome == 'success'
+        if: github.event.inputs.publish == 'true' && success() && steps.check-version.outcome == 'success'
         env:
           VERSION: '${{ steps.version.outputs.plugin_version }}'
         run: >
