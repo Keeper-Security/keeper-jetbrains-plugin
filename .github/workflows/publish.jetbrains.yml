@@ -1,0 +1,18 @@
+name: Build & Publish Keeper Security JetBrains Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to JetBrains Marketplace (uncheck to build only)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  hello:
+    name: Hello World
+    runs-on: ubuntu-latest
+    
+    steps:
+      - run: echo "Hello World"
