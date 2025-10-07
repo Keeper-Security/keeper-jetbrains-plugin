@@ -61,18 +61,14 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
       - name: Install Syft
-        run: >
+        run: |
           echo "Installing Syft v1.18.1..."
-          curl -sSfL
-          https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s
-          -- -b /tmp/bin v1.18.1
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /tmp/bin v1.18.1
           echo "/tmp/bin" >> $GITHUB_PATH
       - name: Install Manifest CLI
-        run: >
+        run: |
           echo "Installing Manifest CLI v0.18.3..."
-          curl -sSfL
-          https://raw.githubusercontent.com/manifest-cyber/cli/main/install.sh |
-          sh -s -- -b /tmp/bin v0.18.3
+          curl -sSfL https://raw.githubusercontent.com/manifest-cyber/cli/main/install.sh | sh -s -- -b /tmp/bin v0.18.3
       - name: Create Syft configuration
         run: |
           cat > syft-config.yaml << 'EOF'
@@ -97,10 +93,9 @@ jobs:
       - name: Generate and upload SBOM
         env:
           MANIFEST_API_KEY: '${{ secrets.MANIFEST_TOKEN }}'
-        run: >
+        run: |
           echo "Detecting JetBrains plugin version..."
-          VERSION=$(./gradlew properties -q | grep "^version:" | awk '{print
-          $2}')
+          VERSION=$(./gradlew properties -q | grep "^version:" | awk '{print $2}')
           if [ -z "$VERSION" ]; then
             VERSION="0.0.1"
             echo "Could not detect version, using default: ${VERSION}"
@@ -118,8 +113,7 @@ jobs:
             --publish=true \
             --asset-label=application,sbom-generated,java,jetbrains-plugin \
             --generator-config=syft-config.yaml
-          echo "SBOM generated and uploaded successfully:
-          jetbrains-plugin-sbom.json"
+          echo "SBOM generated and uploaded successfully: jetbrains-plugin-sbom.json"
           head -n 20 jetbrains-plugin-sbom.json
 
   publish-marketplace:
@@ -157,9 +151,8 @@ jobs:
             ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/field/password > PRIVATE_KEY_PASSWORD
       - name: Detect Plugin Version
         id: version
-        run: >
-          VERSION=$(./gradlew properties -q | grep "^version:" | awk '{print
-          $2}')
+        run: |
+          VERSION=$(./gradlew properties -q | grep "^version:" | awk '{print $2}')
           if [ -z "$VERSION" ]; then
             echo "Error: Could not detect plugin version from Gradle"
             exit 1
@@ -188,7 +181,7 @@ jobs:
           CERTIFICATE_CHAIN: '${{ github.workspace }}/certificate_chain.crt'
           PRIVATE_KEY: '${{ github.workspace }}/private.pem'
           PRIVATE_KEY_PASSWORD: '${{ steps.ksmsecrets.outputs.PRIVATE_KEY_PASSWORD }}'
-        run: >
+        run: |
           echo "Publishing Keeper Security JetBrains Plugin v${{ steps.version.outputs.plugin_version }}..."
           ./gradlew publishPlugin -Pintellij.publish.token=$PUBLISH_TOKEN
       - name: Upload plugin artifact for testing
@@ -201,13 +194,9 @@ jobs:
         if: github.event.inputs.publish == 'true' && success() && steps.check-version.outcome == 'success'
         env:
           VERSION: '${{ steps.version.outputs.plugin_version }}'
-        run: >
-          echo "## JetBrains Plugin Published Successfully!" >>
-          $GITHUB_STEP_SUMMARY
+        run: |
+          echo "## JetBrains Plugin Published Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Plugin:** Keeper Security JetBrains Plugin" >>
-          $GITHUB_STEP_SUMMARY
+          echo "**Plugin:** Keeper Security JetBrains Plugin" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
-          echo "**Marketplace:**
-          https://plugins.jetbrains.com/plugin/${{ secrets.JETBRAINS_PLUGIN_ID }}" >>
-          $GITHUB_STEP_SUMMARY
+          echo "**Marketplace:** https://plugins.jetbrains.com/plugin/${{ secrets.JETBRAINS_PLUGIN_ID }}" >> $GITHUB_STEP_SUMMARY
