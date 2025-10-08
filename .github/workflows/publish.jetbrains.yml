@@ -145,10 +145,10 @@ jobs:
         with:
           keeper-secret-config: '${{ secrets.KSM_JETBRAINS_CONFIG }}'
           secrets: |
-            ${{ secrets.KSM_JETBRAINS_PUBLISH_TOKEN_RECORD_UID }}/field/password > MARKETPLACE_TOKEN
-            ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/file/certificate_chain.crt > file:certificate_chain.crt
-            ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/file/private.pem > file:private.pem
-            ${{ secrets.KSM_JETBRAINS_CERT_RECORD_UID }}/field/password > PRIVATE_KEY_PASSWORD
+            0zldTBN8W-kg5kzAPAODvA/custom_field/marketplace_token > MARKETPLACE_TOKEN
+            0zldTBN8W-kg5kzAPAODvA/file/certificate_chain.crt > file:certificate_chain.crt
+            0zldTBN8W-kg5kzAPAODvA/file/private.pem > file:private.pem
+            0zldTBN8W-kg5kzAPAODvA/custom_field/private_key_password > PRIVATE_KEY_PASSWORD
       - name: Detect Plugin Version
         id: version
         run: |
