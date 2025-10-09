@@ -146,6 +146,12 @@ tasks {
     publishPlugin {
         dependsOn(patchChangelog)
     }
+
+    // Task to copy runtime dependencies for SBOM generation
+    register<Copy>("copyDependencies") {
+        from(configurations.runtimeClasspath)
+        into("build/sbom-deps")
+    }
 }
 
 tasks.test {

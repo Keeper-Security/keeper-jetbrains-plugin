@@ -60,36 +60,46 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Copy runtime dependencies for SBOM scanning
+        run: |
+          echo "Building project and copying runtime dependencies..."
+          ./gradlew copyDependencies --no-daemon
+          echo "Copying plugin JAR to SBOM directory..."
+          mkdir -p build/sbom-deps/plugin
+          cp build/libs/*.jar build/sbom-deps/plugin/ || true
+          echo "Dependencies collected in build/sbom-deps:"
+          ls -la build/sbom-deps/
+
       - name: Install Syft
         run: |
           echo "Installing Syft v1.18.1..."
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /tmp/bin v1.18.1
           echo "/tmp/bin" >> $GITHUB_PATH
+
       - name: Install Manifest CLI
         run: |
           echo "Installing Manifest CLI v0.18.3..."
           curl -sSfL https://raw.githubusercontent.com/manifest-cyber/cli/main/install.sh | sh -s -- -b /tmp/bin v0.18.3
+
       - name: Create Syft configuration
         run: |
           cat > syft-config.yaml << 'EOF'
           package:
-            search:
-              scope: all-layers
-              exclude:
-                - "**/test/**"
-                - "**/examples/**"
             cataloger:
-              enabled: true
               java:
                 enabled: true
-                search-jar: true
-              nodejs:
-                enabled: false
-              python:
-                enabled: false
-              ruby:
-                enabled: false
           EOF
+
       - name: Generate and upload SBOM
         env:
           MANIFEST_API_KEY: '${{ secrets.MANIFEST_TOKEN }}'
@@ -102,8 +112,8 @@ jobs:
           else
             echo "Detected version: ${VERSION}"
           fi
-          echo "Generating SBOM with Manifest CLI..."
-          /tmp/bin/manifest sbom "." \
+          echo "Generating SBOM from build/sbom-deps directory..."
+          /tmp/bin/manifest sbom "build/sbom-deps" \
             --generator=syft \
             --name=keeper-security-jetbrains-plugin \
             --version=${VERSION} \
