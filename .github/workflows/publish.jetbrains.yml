@@ -72,11 +72,8 @@ jobs:
 
       - name: Copy runtime dependencies for SBOM scanning
         run: |
-          echo "Building project and copying runtime dependencies..."
+          echo "Copying runtime dependencies for SBOM scanning..."
           ./gradlew copyDependencies --no-daemon
-          echo "Copying plugin JAR to SBOM directory..."
-          mkdir -p build/sbom-deps/plugin
-          cp build/libs/*.jar build/sbom-deps/plugin/ || true
           echo "Dependencies collected in build/sbom-deps:"
           ls -la build/sbom-deps/
 
