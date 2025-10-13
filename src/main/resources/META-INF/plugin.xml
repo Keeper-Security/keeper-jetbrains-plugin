@@ -8,14 +8,8 @@
     <resource-bundle>messages.KeeperSecurity</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Register KeeperVaultService -->
-        <projectService serviceImplementation="keepersecurity.action.KeeperVaultService"/>
-
-        <!-- Add these new ones -->
-        <applicationService serviceImplementation="keepersecurity.service.KeeperPluginService"/>
-        
         <!-- Startup activities -->
-        <postStartupActivity implementation="keepersecurity.service.KeeperStartupActivity" />
+        <projectActivity implementation="keepersecurity.service.KeeperStartupActivity" />
     </extensions>
 
     <actions>
