@@ -138,9 +138,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                             // Process standard fields
                             recordJson.fields?.forEach { field ->
                                 if (field.type.isNotBlank() && !field.value.isNullOrEmpty()) {
-                                    val firstValue = field.value.firstOrNull()
-                                    
-                                    when (firstValue)  {
+                                    when (val firstValue = field.value.firstOrNull())  {
                                         // Complex object fields (address, name, host, bankAccount, paymentCard, securityQuestion, keyPair)
                                         is JsonObject -> {
                                             // Extract all non-empty sub-fields from the object
@@ -182,9 +180,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                 // For custom fields with labels (user-created custom fields)
                                 if (!customField.label.isNullOrBlank() && !customField.value.isNullOrEmpty()) {
                                     val key = customField.label.replace("\\s".toRegex(), "_")
-                                    val firstValue = customField.value.firstOrNull()
-                                    
-                                    when (firstValue) {
+                                    when (val firstValue = customField.value.firstOrNull()) {
                                         is JsonObject -> {
                                             firstValue.keys.forEach { subKey ->
                                                 val subValue = firstValue[subKey]
@@ -213,9 +209,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                 }
                                 // For custom fields without labels (built-in types like name, phone, etc.)
                                 else if (customField.label == null && !customField.type.isNullOrBlank() && !customField.value.isNullOrEmpty()) {
-                                    val firstValue = customField.value.firstOrNull()
-                                    
-                                    when (firstValue) {
+                                    when (val firstValue = customField.value.firstOrNull()) {
                                         is JsonObject -> {
                                             firstValue.keys.forEach { subKey ->
                                                 val subValue = firstValue[subKey]
@@ -238,7 +232,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                             // Handle other JsonElement types (JsonArray, null, etc.)
                                             val preview = customField.getDisplayValue().take(50)
                                             if (preview != "[empty]" && preview.isNotBlank()) {
-                                                fieldOptions.add("${customField.type}: $preview (custom)" to (customField.type ?: "unknown"))
+                                                fieldOptions.add("${customField.type}: $preview (custom)" to customField.type!!)
                                             }
                                         }
                                     }

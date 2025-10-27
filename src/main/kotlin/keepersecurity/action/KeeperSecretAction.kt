@@ -286,7 +286,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
     /**
         * Extracts a field value from a Keeper JSON record.
         * Handles both legacy format (--legacy) and new format
-        * Supports simple fields (e.g., "password") and complex bracket notation (e.g., "address[zip]", "custom.field[key]")
+        * Supports simple fields (e.g., `password`) and complex bracket notation (e.g., `address[zip]`, `custom.field[subkey]`)
         * Searches ALL possible locations in the JSON for maximum extensibility
         */
     private fun extractFieldValue(jsonObject: JsonObject, fieldPath: String): String? {
@@ -387,7 +387,6 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 if (!valueArray.isNullOrEmpty()) {
                     val firstValue = valueArray[0]
                     if (firstValue is JsonObject) {
-                        logger.info("Extracted object from 'value' array")
                         return firstValue
                     }
                 }
@@ -440,7 +439,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                     val firstValue = valueArray[0]
                     val content = firstValue.jsonPrimitive.contentOrNull
                     if (content != null) {
-                        logger.info("Extracted string value from 'value' array")
+                        logger.info("Extracted string value from 'value' array in 'fields'")
                         return content
                     }
                 }
@@ -464,7 +463,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                     val firstValue = valueArray[0]
                     val content = firstValue.jsonPrimitive.contentOrNull
                     if (content != null) {
-                        logger.info("Extracted string value from 'value' array")
+                        logger.info("Extracted string value from 'value' array in 'custom'")
                         return content
                     }
                 }
@@ -482,7 +481,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 val value = customFieldObj["value"]
                 val content = value?.jsonPrimitive?.contentOrNull
                 if (content != null) {
-                    logger.info("Extracted string value")
+                    logger.info("Extracted string value from 'custom_fields'")
                     return content
                 }
             }
