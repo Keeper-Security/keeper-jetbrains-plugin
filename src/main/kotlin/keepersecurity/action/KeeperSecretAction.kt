@@ -24,7 +24,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 // Added imports
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -210,7 +209,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
         val errors = mutableListOf<String>()
         val envVars = mutableMapOf<String, String>()
         // FIXED REGEX: Now captures bracket notation like address[zip] and custom.field[key]
-        val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]+)/field/([^\s]+)""")
+        val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]+)/field/(\S+)""")
         
         // Parse .env file and identify Keeper references (files are already saved)
         val keeperRefs = mutableListOf<Triple<String, String, String>>() // key, uid, field
@@ -362,7 +361,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 logger.info("Found '$fieldName' in 'fields' array")
                 // Extract the first value if it's an object
                 val valueArray = fieldObj["value"]?.jsonArray
-                if (valueArray != null && valueArray.isNotEmpty()) {
+                if (!valueArray.isNullOrEmpty()) {
                     val firstValue = valueArray[0]
                     if (firstValue is JsonObject) {
                         logger.info("Extracted object from 'value' array")
@@ -385,7 +384,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 logger.info("Found '$fieldName' in 'custom' array (type='$type', label='$label')")
                 // Extract the first value if it's an object
                 val valueArray = customFieldObj["value"]?.jsonArray
-                if (valueArray != null && valueArray.isNotEmpty()) {
+                if (!valueArray.isNullOrEmpty()) {
                     val firstValue = valueArray[0]
                     if (firstValue is JsonObject) {
                         logger.info("Extracted object from 'value' array")
@@ -437,7 +436,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 logger.info("Found '$fieldName' in 'fields' array")
                 // Extract the first value
                 val valueArray = fieldObj["value"]?.jsonArray
-                if (valueArray != null && valueArray.isNotEmpty()) {
+                if (!valueArray.isNullOrEmpty()) {
                     val firstValue = valueArray[0]
                     val content = firstValue.jsonPrimitive.contentOrNull
                     if (content != null) {
@@ -461,7 +460,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 logger.info("Found '$fieldName' in 'custom' array (type='$type', label='$label')")
                 // Extract the first value
                 val valueArray = customFieldObj["value"]?.jsonArray
-                if (valueArray != null && valueArray.isNotEmpty()) {
+                if (!valueArray.isNullOrEmpty()) {
                     val firstValue = valueArray[0]
                     val content = firstValue.jsonPrimitive.contentOrNull
                     if (content != null) {

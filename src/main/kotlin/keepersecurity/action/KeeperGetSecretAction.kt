@@ -140,9 +140,9 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                 if (field.type.isNotBlank() && !field.value.isNullOrEmpty()) {
                                     val firstValue = field.value.firstOrNull()
                                     
-                                    when {
+                                    when (firstValue)  {
                                         // Complex object fields (address, name, host, bankAccount, paymentCard, securityQuestion, keyPair)
-                                        firstValue is JsonObject -> {
+                                        is JsonObject -> {
                                             // Extract all non-empty sub-fields from the object
                                             firstValue.keys.forEach { subKey ->
                                                 val subValue = firstValue[subKey]
@@ -157,7 +157,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                             }
                                         }
                                         // Simple string value (login, password, url, text, etc.)
-                                        firstValue is JsonPrimitive -> {
+                                        is JsonPrimitive -> {
                                             val content = firstValue.contentOrNull
                                             if (!content.isNullOrBlank()) {
                                                 val preview = content.take(50)
@@ -184,8 +184,8 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                     val key = customField.label.replace("\\s".toRegex(), "_")
                                     val firstValue = customField.value.firstOrNull()
                                     
-                                    when {
-                                        firstValue is JsonObject -> {
+                                    when (firstValue) {
+                                        is JsonObject -> {
                                             firstValue.keys.forEach { subKey ->
                                                 val subValue = firstValue[subKey]
                                                 if (subValue is JsonPrimitive && !subValue.contentOrNull.isNullOrBlank()) {
@@ -196,7 +196,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                                 }
                                             }
                                         }
-                                        firstValue is JsonPrimitive -> {
+                                        is JsonPrimitive -> {
                                             val content = firstValue.contentOrNull
                                             if (!content.isNullOrBlank()) {
                                                 val preview = content.take(50)
@@ -215,8 +215,8 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                 else if (customField.label == null && !customField.type.isNullOrBlank() && !customField.value.isNullOrEmpty()) {
                                     val firstValue = customField.value.firstOrNull()
                                     
-                                    when {
-                                        firstValue is JsonObject -> {
+                                    when (firstValue) {
+                                        is JsonObject -> {
                                             firstValue.keys.forEach { subKey ->
                                                 val subValue = firstValue[subKey]
                                                 if (subValue is JsonPrimitive && !subValue.contentOrNull.isNullOrBlank()) {
@@ -227,11 +227,18 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                                 }
                                             }
                                         }
-                                        firstValue is JsonPrimitive -> {
+                                        is JsonPrimitive -> {
                                             val content = firstValue.contentOrNull
                                             if (!content.isNullOrBlank()) {
                                                 val preview = content.take(50)
                                                 fieldOptions.add("${customField.type}: $preview (custom)" to customField.type)
+                                            }
+                                        }
+                                        else -> {
+                                            // Handle other JsonElement types (JsonArray, null, etc.)
+                                            val preview = customField.getDisplayValue().take(50)
+                                            if (preview != "[empty]" && preview.isNotBlank()) {
+                                                fieldOptions.add("${customField.type}: $preview (custom)" to (customField.type ?: "unknown"))
                                             }
                                         }
                                     }
