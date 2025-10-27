@@ -286,7 +286,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
     /**
         * Extracts a field value from a Keeper JSON record.
         * Handles both legacy format (--legacy) and new format
-        * Supports simple fields (e.g., `password`) and complex bracket notation (e.g., `address[zip]`, `custom.field[subkey]`)
+        * Supports simple fields (e.g., `password`) and complex bracket notation (e.g., `address` with `zip` subfield, `custom.field` with subkey)
         * Searches ALL possible locations in the JSON for maximum extensibility
         */
     private fun extractFieldValue(jsonObject: JsonObject, fieldPath: String): String? {
@@ -387,6 +387,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 if (!valueArray.isNullOrEmpty()) {
                     val firstValue = valueArray[0]
                     if (firstValue is JsonObject) {
+                        logger.info("Extracted object from 'value' array in 'custom'")
                         return firstValue
                     }
                 }
@@ -403,7 +404,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 logger.info("Found '$fieldName' in 'custom_fields' array (name='$name')")
                 val value = customFieldObj["value"]
                 if (value is JsonObject) {
-                    logger.info("Value is a JsonObject")
+                    logger.info("Value is a JsonObject in 'custom_fields'")
                     return value
                 }
             }
@@ -432,7 +433,6 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
             val type = fieldObj["type"]?.jsonPrimitive?.contentOrNull
             
             if (type == fieldName) {
-                logger.info("Found '$fieldName' in 'fields' array")
                 // Extract the first value
                 val valueArray = fieldObj["value"]?.jsonArray
                 if (!valueArray.isNullOrEmpty()) {
@@ -456,7 +456,6 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
             if (type == fieldName || 
                 label == fieldName || 
                 label?.replace("\\s".toRegex(), "_") == fieldName) {
-                logger.info("Found '$fieldName' in 'custom' array (type='$type', label='$label')")
                 // Extract the first value
                 val valueArray = customFieldObj["value"]?.jsonArray
                 if (!valueArray.isNullOrEmpty()) {
@@ -477,7 +476,6 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
             
             // Match by name (with or without space-to-underscore conversion)
             if (name == fieldName || name?.replace("\\s".toRegex(), "_") == fieldName) {
-                logger.info("Found '$fieldName' in 'custom_fields' array (name='$name')")
                 val value = customFieldObj["value"]
                 val content = value?.jsonPrimitive?.contentOrNull
                 if (content != null) {

@@ -232,7 +232,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                             // Handle other JsonElement types (JsonArray, null, etc.)
                                             val preview = customField.getDisplayValue().take(50)
                                             if (preview != "[empty]" && preview.isNotBlank()) {
-                                                fieldOptions.add("${customField.type}: $preview (custom)" to customField.type!!)
+                                                fieldOptions.add("${customField.type}: $preview (custom)" to customField.type)
                                             }
                                         }
                                     }
