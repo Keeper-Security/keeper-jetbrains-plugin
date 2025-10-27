@@ -94,8 +94,9 @@ object KeeperJsonUtils {
     }
     
     /**
-     * Look for properly structured JSON anywhere in the text
-     */
+    * Look for properly structured JSON anywhere in the text
+    * Improved to handle deeply nested objects correctly
+    */
     private fun findStructuredJson(output: String, expectedType: String, logger: Logger? = null): String? {
         val targetChar = if (expectedType == "array") '[' else '{'
         val endChar = if (expectedType == "array") ']' else '}'
@@ -118,7 +119,22 @@ object KeeperJsonUtils {
                 }
             }
             
-            // Try to find the matching end bracket/brace
+            // For objects, check if this looks like a record start
+            // Record should have "record_uid" or "title" near the beginning
+            if (targetChar == '{') {
+                val preview = output.substring(jsonStart, minOf(jsonStart + 200, output.length))
+                val looksLikeRecord = preview.contains("\"record_uid\"") || 
+                                    preview.contains("\"title\"") ||
+                                    preview.contains("\"type\"") && preview.contains("\"fields\"")
+                
+                if (!looksLikeRecord) {
+                    // This might be a nested object, skip it
+                    startPos = jsonStart + 1
+                    continue
+                }
+            }
+            
+            // Try to find the matching end bracket/brace with proper nesting
             val jsonEnd = findMatchingBracket(output, jsonStart, targetChar, endChar)
             if (jsonEnd != -1) {
                 val jsonCandidate = output.substring(jsonStart, jsonEnd + 1)
@@ -187,18 +203,36 @@ object KeeperJsonUtils {
     }
     
     /**
-     * Find the matching closing bracket/brace for a given opening position
-     */
+    * Find the matching closing bracket/brace for a given opening position
+    * Properly handles strings to avoid counting brackets inside string literals
+    */
     private fun findMatchingBracket(text: String, startPos: Int, openChar: Char, closeChar: Char): Int {
         var count = 1
         var pos = startPos + 1
+        var inString = false
+        var escapeNext = false
         
         while (pos < text.length && count > 0) {
-            when (text[pos]) {
-                openChar -> count++
-                closeChar -> count--
+            val char = text[pos]
+            
+            when {
+                escapeNext -> {
+                    escapeNext = false
+                }
+                char == '\\' && inString -> {
+                    escapeNext = true
+                }
+                char == '"' -> {
+                    inString = !inString
+                }
+                !inString && char == openChar -> {
+                    count++
+                }
+                !inString && char == closeChar -> {
+                    count--
+                    if (count == 0) return pos
+                }
             }
-            if (count == 0) return pos
             pos++
         }
         

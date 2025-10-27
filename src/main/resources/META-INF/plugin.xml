@@ -14,49 +14,62 @@
 
     <actions>
         <!-- Keeper Vault group in Tools menu -->
-        <group id="KeeperVaultGroup" text="Keeper Vault" description="Keeper Vault actions">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-            
-            <!-- Authorization check action -->
-            <action id="keepersecurity.action.KeeperAuthAction"
-                    class="keepersecurity.action.KeeperAuthAction"
-                    text="Check Keeper Authorization"
-                    description="Check if Keeper CLI is installed and you're logged in"/>
-                    
-            <!-- Secret retrieval action -->
-            <action id="keepersecurity.action.KeeperSecretAction"
-                    class="keepersecurity.action.KeeperSecretAction"
-                    text="Run Keeper Securely"
-                    description="Replace Keeper references with actual secret values"/>
-                    
-            <!-- Add Keeper Record action -->
-            <action id="keepersecurity.action.KeeperRecordAddAction"
-                    class="keepersecurity.action.KeeperRecordAddAction"
-                    text="Add Keeper Record"
-                    description="Create a new Keeper Vault record and replace the selected variable with its reference"/>
-                    
-            <!-- Update Keeper Record action -->
-            <action id="keepersecurity.action.KeeperRecordUpdateAction"
-                    class="keepersecurity.action.KeeperRecordUpdateAction"
-                    text="Update Keeper Record"
-                    description="Update an existing Keeper Vault record and replace the selected variable with its updated reference"/>
+        <group id="KeeperVaultGroup"
+                text="Keeper Vault"
+                description="Keeper Vault actions"
+                 popup="true">
+                <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
 
-            <action id="keepersecurity.action.KeeperFolderSelectActionEditor"
-                    class="keepersecurity.action.KeeperFolderSelectAction"
-                    text="Get Keeper Folder"
-                    description="Get folder UUID from Keeper Vault"/>
+        <!-- Now add all Keeper actions to the KeeperVaultGroup -->
+        <action id="keepersecurity.action.KeeperAuthAction"
+                class="keepersecurity.action.KeeperAuthAction"
+                text="Check Keeper Authorization"
+                description="Check if Keeper CLI is installed and you're logged in">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
 
-            <action id="keepersecurity.action.KeeperGetSecretAction"
+        <action id="keepersecurity.action.KeeperSecretAction"
+                class="keepersecurity.action.KeeperSecretAction"
+                text="Run Keeper Securely"
+                description="Replace Keeper references with actual secret values">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
+
+        <action id="keepersecurity.action.KeeperRecordAddAction"
+                class="keepersecurity.action.KeeperRecordAddAction"
+                text="Add Keeper Record"
+                description="Create a new Keeper Vault record and replace the selected variable with its reference">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
+
+        <action id="keepersecurity.action.KeeperRecordUpdateAction"
+                class="keepersecurity.action.KeeperRecordUpdateAction"
+                text="Update Keeper Record"
+                description="Update an existing Keeper Vault record and replace the selected variable with its updated reference">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
+
+        <action id="keepersecurity.action.KeeperFolderSelectAction"
+                class="keepersecurity.action.KeeperFolderSelectAction"
+                text="Get Keeper Folder"
+                description="Get folder UUID from Keeper Vault">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
+
+        <action id="keepersecurity.action.KeeperGetSecretAction"
                 class="keepersecurity.action.KeeperGetSecretAction"
                 text="Get Keeper Secret"
-                description="Choose a Keeper record and insert its field reference into the editor"/>
+                description="Choose a Keeper record and insert its field reference into the editor">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
 
-            <!-- Generate Keeper Secrets action -->
-            <action id="keepersecurity.action.KeeperGenerateSecretsAction"
+        <action id="keepersecurity.action.KeeperGenerateSecretsAction"
                 class="keepersecurity.action.KeeperGenerateSecretsAction"
                 text="Generate Keeper Secret"
-                description="Generate a strong password and create a new Keeper Vault record"/>
-        </group>
+                description="Generate a strong password and create a new Keeper Vault record">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
         
         <!-- Right-click editor popup menu -->
         <group id="KeeperVaultEditorGroup">
@@ -83,7 +96,7 @@
                     text="Update Keeper Record"
                     description="Update an existing Keeper Vault record and replace the selected variable with its reference"/>
 
-            <action id="keepersecurity.action.KeeperFolderSelectAction"
+            <action id="keepersecurity.action.KeeperFolderSelectActionEditor"
                     class="keepersecurity.action.KeeperFolderSelectAction"
                     text="Get Keeper Folder"
                     description="Select a Keeper folder and save its UUID"/>

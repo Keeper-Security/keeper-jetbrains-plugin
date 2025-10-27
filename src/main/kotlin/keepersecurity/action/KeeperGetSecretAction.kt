@@ -14,9 +14,13 @@ import keepersecurity.service.KeeperShellService
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
 import keepersecurity.model.KeeperRecord
+import keepersecurity.model.getDisplayValue
 import keepersecurity.util.KeeperJsonUtils
 import kotlinx.serialization.ExperimentalSerializationApi
 import keepersecurity.util.KeeperCommandUtils
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 @OptIn(ExperimentalSerializationApi::class)
 class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
@@ -111,6 +115,16 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
 
                             val recordJson = try {
                                 val jsonString = KeeperJsonUtils.extractJsonObject(recordJsonText, logger)
+
+                                // ADD THESE LINES TO SEE WHAT WAS EXTRACTED
+                                logger.info("=".repeat(50))
+                                logger.info("RAW OUTPUT LENGTH: ${recordJsonText.length}")
+                                logger.info("EXTRACTED JSON LENGTH: ${jsonString.length}")
+                                logger.info("EXTRACTED JSON: $jsonString")
+                                logger.info("=".repeat(50))
+                                
+
+
                                 json.decodeFromString<KeeperRecord>(jsonString)
                             } catch (ex: Exception) {
                                 logger.error("Failed to parse record JSON", ex)
@@ -124,15 +138,103 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                             // Process standard fields
                             recordJson.fields?.forEach { field ->
                                 if (field.type.isNotBlank() && !field.value.isNullOrEmpty()) {
-                                    fieldOptions.add("${field.type} (standard)" to field.type)
+                                    val firstValue = field.value.firstOrNull()
+                                    
+                                    when {
+                                        // Complex object fields (address, name, host, bankAccount, paymentCard, securityQuestion, keyPair)
+                                        firstValue is JsonObject -> {
+                                            // Extract all non-empty sub-fields from the object
+                                            firstValue.keys.forEach { subKey ->
+                                                val subValue = firstValue[subKey]
+                                                if (subValue is JsonPrimitive && !subValue.contentOrNull.isNullOrBlank()) {
+                                                    val displayValue = subValue.contentOrNull?.take(30) ?: ""
+                                                    // Display: "address.street1: 100 Main Street"
+                                                    // Keeper Notation: "address[street1]"
+                                                    fieldOptions.add(
+                                                        "${field.type}.$subKey: $displayValue (standard)" to "${field.type}[$subKey]"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        // Simple string value (login, password, url, text, etc.)
+                                        firstValue is JsonPrimitive -> {
+                                            val content = firstValue.contentOrNull
+                                            if (!content.isNullOrBlank()) {
+                                                val preview = content.take(50)
+                                                // Display: "login: username"
+                                                // Keeper Notation: "login"
+                                                fieldOptions.add("${field.type}: $preview (standard)" to field.type)
+                                            }
+                                        }
+                                        // Fallback for other types
+                                        else -> {
+                                            val preview = field.getDisplayValue().take(50)
+                                            if (preview != "[empty]" && preview.isNotBlank()) {
+                                                fieldOptions.add("${field.type}: $preview (standard)" to field.type)
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                        
+
                             // Process custom fields
                             recordJson.custom?.forEach { customField ->
-                                if (customField.label.isNotBlank() && !customField.value.isNullOrEmpty()) {
+                                // For custom fields with labels (user-created custom fields)
+                                if (!customField.label.isNullOrBlank() && !customField.value.isNullOrEmpty()) {
                                     val key = customField.label.replace("\\s".toRegex(), "_")
-                                    fieldOptions.add("${customField.label} (custom)" to "custom.${key}")
+                                    val firstValue = customField.value.firstOrNull()
+                                    
+                                    when {
+                                        firstValue is JsonObject -> {
+                                            firstValue.keys.forEach { subKey ->
+                                                val subValue = firstValue[subKey]
+                                                if (subValue is JsonPrimitive && !subValue.contentOrNull.isNullOrBlank()) {
+                                                    val displayValue = subValue.contentOrNull?.take(30) ?: ""
+                                                    fieldOptions.add(
+                                                        "${customField.label}.$subKey: $displayValue (custom)" to "custom.${key}[$subKey]"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        firstValue is JsonPrimitive -> {
+                                            val content = firstValue.contentOrNull
+                                            if (!content.isNullOrBlank()) {
+                                                val preview = content.take(50)
+                                                fieldOptions.add("${customField.label}: $preview (custom)" to "custom.${key}")
+                                            }
+                                        }
+                                        else -> {
+                                            val preview = customField.getDisplayValue().take(50)
+                                            if (preview != "[empty]" && preview.isNotBlank()) {
+                                                fieldOptions.add("${customField.label}: $preview (custom)" to "custom.${key}")
+                                            }
+                                        }
+                                    }
+                                }
+                                // For custom fields without labels (built-in types like name, phone, etc.)
+                                else if (customField.label == null && !customField.type.isNullOrBlank() && !customField.value.isNullOrEmpty()) {
+                                    val firstValue = customField.value.firstOrNull()
+                                    
+                                    when {
+                                        firstValue is JsonObject -> {
+                                            firstValue.keys.forEach { subKey ->
+                                                val subValue = firstValue[subKey]
+                                                if (subValue is JsonPrimitive && !subValue.contentOrNull.isNullOrBlank()) {
+                                                    val displayValue = subValue.contentOrNull?.take(30) ?: ""
+                                                    fieldOptions.add(
+                                                        "${customField.type}.$subKey: $displayValue (custom)" to "${customField.type}[$subKey]"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        firstValue is JsonPrimitive -> {
+                                            val content = firstValue.contentOrNull
+                                            if (!content.isNullOrBlank()) {
+                                                val preview = content.take(50)
+                                                fieldOptions.add("${customField.type}: $preview (custom)" to customField.type)
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
