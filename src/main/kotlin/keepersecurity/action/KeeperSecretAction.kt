@@ -23,8 +23,11 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 // Added imports
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.contentOrNull
 import keepersecurity.util.KeeperCommandUtils
 import keepersecurity.util.KeeperJsonUtils
 import keepersecurity.service.KeeperShellService
@@ -135,8 +138,6 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
         }.queue()
     }
 
-    // ... chooseEnvFile and browseForEnvFile methods remain the same ...
-
     private fun chooseEnvFile(project: Project, file: VirtualFile): File? {
         val defaultEnv = File(file.parent.path, ".env")
         val options = if (defaultEnv.exists()) arrayOf(".env", "Browse") else arrayOf("Browse")
@@ -207,7 +208,8 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
     ): ProcessResult {
         val errors = mutableListOf<String>()
         val envVars = mutableMapOf<String, String>()
-        val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]+)/field/(\w+)""")
+        // FIXED REGEX: Now captures bracket notation like address[zip] and custom.field[key]
+        val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]+)/field/(\S+)""")
         
         // Parse .env file and identify Keeper references (files are already saved)
         val keeperRefs = mutableListOf<Triple<String, String, String>>() // key, uid, field
@@ -247,12 +249,18 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
                 val secretDuration = System.currentTimeMillis() - secretStartTime
                 
                 logger.info("Secret $key fetched in ${secretDuration}ms")
+                logger.info("Raw JSON length: ${secretJson.length}")
+                logger.info("Raw JSON preview (first 500 chars): ${secretJson.take(500)}")
                 
                 val jsonElement = json.parseToJsonElement(secretJson)
+                logger.info("Successfully parsed JSON to JsonElement")
+                
+                // FIXED: Now handles bracket notation like address[zip]
                 val secret = try {
-                    jsonElement.jsonObject[field]?.jsonPrimitive?.content
+                    extractFieldValue(jsonElement.jsonObject, field)
                 } catch (e: Exception) {
-                    logger.warn("Failed to extract field '$field' from JSON", e)
+                    logger.error("Failed to extract field '$field' from JSON", e)
+                    logger.error("Stack trace:", e)
                     null
                 }
                 
@@ -275,7 +283,211 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
         return ProcessResult(originalContent, envVars.size, errors, scriptOutput)
     }
 
-    // ... rest of the methods remain the same ...
+    /**
+        * Extracts a field value from a Keeper JSON record.
+        * Handles both legacy format (--legacy) and new format
+        * Supports simple fields (e.g., `password`) and complex bracket notation (e.g., `address` with `zip` subfield, `custom.field` with subkey)
+        * Searches ALL possible locations in the JSON for maximum extensibility
+        */
+    private fun extractFieldValue(jsonObject: JsonObject, fieldPath: String): String? {
+        logger.info("=== EXTRACTING FIELD: $fieldPath ===")
+        logger.info("JSON keys available: ${jsonObject.keys.joinToString(", ")}")
+        
+        // Parse the field path
+        val bracketIndex = fieldPath.indexOf('[')
+        
+        if (bracketIndex > 0 && fieldPath.endsWith(']')) {
+            // Complex field with bracket notation: address[zip]
+            val parentFieldName = fieldPath.substring(0, bracketIndex).removePrefix("custom.")
+            val subFieldName = fieldPath.substring(bracketIndex + 1, fieldPath.length - 1)
+            
+            logger.info("Extracting complex field: parent='$parentFieldName', subField='$subFieldName'")
+            
+            // Search for the parent field everywhere in the JSON
+            val parentObject = findFieldObjectAnywhere(jsonObject, parentFieldName)
+            
+            if (parentObject != null) {
+                val result = parentObject[subFieldName]?.jsonPrimitive?.contentOrNull
+                if (result != null) {
+                    logger.info("Found sub-field '$subFieldName' in parent '$parentFieldName': ${result.take(10)}...")
+                    return result
+                } else {
+                    logger.warn("Found parent '$parentFieldName' but sub-field '$subFieldName' not found in it")
+                }
+            } else {
+                logger.warn("Parent field '$parentFieldName' not found anywhere in JSON")
+            }
+            
+            return null
+        } else {
+            // Simple field: password, login, custom.field, etc.
+            val fieldName = fieldPath.removePrefix("custom.")
+            logger.info("Extracting simple field: '$fieldName'")
+            
+            // Search for the field value everywhere in the JSON
+            val result = findFieldValueAnywhere(jsonObject, fieldName)
+            
+            if (result != null) {
+                logger.info("Found field '$fieldName': ${result.take(10)}...")
+            } else {
+                logger.warn("Field '$fieldName' not found anywhere in JSON")
+            }
+            
+            return result
+        }
+    }
+
+    /**
+    * Searches for a field object (JsonObject) by name in all possible locations
+    * Returns the JsonObject value if found, null otherwise
+    */
+    private fun findFieldObjectAnywhere(jsonObject: JsonObject, fieldName: String): JsonObject? {
+        logger.info("Searching for field object '$fieldName' in all locations...")
+        
+        // 1. Check top-level (legacy format: "address": {...})
+        jsonObject[fieldName]?.let { value ->
+            if (value is JsonObject) {
+                logger.info("Found '$fieldName' as top-level object")
+                return value
+            }
+        }
+        
+        // 2. Check in "fields" array (new format)
+        jsonObject["fields"]?.jsonArray?.forEach { fieldElement ->
+            val fieldObj = fieldElement.jsonObject
+            val type = fieldObj["type"]?.jsonPrimitive?.contentOrNull
+            
+            if (type == fieldName) {
+                logger.info("Found '$fieldName' in 'fields' array")
+                // Extract the first value if it's an object
+                val valueArray = fieldObj["value"]?.jsonArray
+                if (!valueArray.isNullOrEmpty()) {
+                    val firstValue = valueArray[0]
+                    if (firstValue is JsonObject) {
+                        logger.info("Extracted object from 'value' array")
+                        return firstValue
+                    }
+                }
+            }
+        }
+        
+        // 3. Check in "custom" array (new format) - CHECK BOTH type AND label
+        jsonObject["custom"]?.jsonArray?.forEach { customFieldElement ->
+            val customFieldObj = customFieldElement.jsonObject
+            val type = customFieldObj["type"]?.jsonPrimitive?.contentOrNull
+            val label = customFieldObj["label"]?.jsonPrimitive?.contentOrNull
+            
+            // Match by type OR label (with or without space-to-underscore conversion)
+            if (type == fieldName || 
+                label == fieldName || 
+                label?.replace("\\s".toRegex(), "_") == fieldName) {
+                logger.info("Found '$fieldName' in 'custom' array (type='$type', label='$label')")
+                // Extract the first value if it's an object
+                val valueArray = customFieldObj["value"]?.jsonArray
+                if (!valueArray.isNullOrEmpty()) {
+                    val firstValue = valueArray[0]
+                    if (firstValue is JsonObject) {
+                        logger.info("Extracted object from 'value' array in 'custom'")
+                        return firstValue
+                    }
+                }
+            }
+        }
+        
+        // 4. Check in "custom_fields" array (legacy format)
+        jsonObject["custom_fields"]?.jsonArray?.forEach { customFieldElement ->
+            val customFieldObj = customFieldElement.jsonObject
+            val name = customFieldObj["name"]?.jsonPrimitive?.contentOrNull?.removeSuffix(":")
+            
+            // Match by name (with or without space-to-underscore conversion)
+            if (name == fieldName || name?.replace("\\s".toRegex(), "_") == fieldName) {
+                logger.info("Found '$fieldName' in 'custom_fields' array (name='$name')")
+                val value = customFieldObj["value"]
+                if (value is JsonObject) {
+                    logger.info("Value is a JsonObject in 'custom_fields'")
+                    return value
+                }
+            }
+        }
+        
+        logger.info("Field object '$fieldName' not found in any location")
+        return null
+    }
+
+    /**
+    * Searches for a simple field value (string) by name in all possible locations
+    * Returns the string value if found, null otherwise
+    */
+    private fun findFieldValueAnywhere(jsonObject: JsonObject, fieldName: String): String? {
+        logger.info("Searching for field value '$fieldName' in all locations...")
+        
+        // 1. Check top-level (legacy format: "password": "value")
+        jsonObject[fieldName]?.jsonPrimitive?.contentOrNull?.let { value ->
+            logger.info("Found '$fieldName' as top-level primitive")
+            return value
+        }
+        
+        // 2. Check in "fields" array (new format)
+        jsonObject["fields"]?.jsonArray?.forEach { fieldElement ->
+            val fieldObj = fieldElement.jsonObject
+            val type = fieldObj["type"]?.jsonPrimitive?.contentOrNull
+            
+            if (type == fieldName) {
+                // Extract the first value
+                val valueArray = fieldObj["value"]?.jsonArray
+                if (!valueArray.isNullOrEmpty()) {
+                    val firstValue = valueArray[0]
+                    val content = firstValue.jsonPrimitive.contentOrNull
+                    if (content != null) {
+                        logger.info("Extracted string value from 'value' array in 'fields'")
+                        return content
+                    }
+                }
+            }
+        }
+        
+        // 3. Check in "custom" array (new format) - CHECK BOTH type AND label
+        jsonObject["custom"]?.jsonArray?.forEach { customFieldElement ->
+            val customFieldObj = customFieldElement.jsonObject
+            val type = customFieldObj["type"]?.jsonPrimitive?.contentOrNull
+            val label = customFieldObj["label"]?.jsonPrimitive?.contentOrNull
+            
+            // Match by type OR label (with or without space-to-underscore conversion)
+            if (type == fieldName || 
+                label == fieldName || 
+                label?.replace("\\s".toRegex(), "_") == fieldName) {
+                // Extract the first value
+                val valueArray = customFieldObj["value"]?.jsonArray
+                if (!valueArray.isNullOrEmpty()) {
+                    val firstValue = valueArray[0]
+                    val content = firstValue.jsonPrimitive.contentOrNull
+                    if (content != null) {
+                        logger.info("Extracted string value from 'value' array in 'custom'")
+                        return content
+                    }
+                }
+            }
+        }
+        
+        // 4. Check in "custom_fields" array (legacy format)
+        jsonObject["custom_fields"]?.jsonArray?.forEach { customFieldElement ->
+            val customFieldObj = customFieldElement.jsonObject
+            val name = customFieldObj["name"]?.jsonPrimitive?.contentOrNull?.removeSuffix(":")
+            
+            // Match by name (with or without space-to-underscore conversion)
+            if (name == fieldName || name?.replace("\\s".toRegex(), "_") == fieldName) {
+                val value = customFieldObj["value"]
+                val content = value?.jsonPrimitive?.contentOrNull
+                if (content != null) {
+                    logger.info("Extracted string value from 'custom_fields'")
+                    return content
+                }
+            }
+        }
+        
+        logger.info("Field value '$fieldName' not found in any location")
+        return null
+    }
     
     private fun runScriptWithEnv(
         envVars: Map<String, String>, 
@@ -315,7 +527,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
     private fun getKeeperJsonFromShell(uid: String): String {
         return try {
             val output = KeeperCommandUtils.executeCommandWithRetry(
-                "get $uid --format json --legacy", 
+                "get $uid --format json", 
                 KeeperCommandUtils.Presets.jsonObject(maxRetries = 3),
                 logger
             )

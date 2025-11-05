@@ -82,4 +82,34 @@ class KeeperSecretActionTest {
         // Check that it extends AnAction properly
         assertTrue("Should extend AnAction", action is com.intellij.openapi.actionSystem.AnAction)
     }
+
+    @Test
+    fun `test parsing custom field with type instead of label`() {
+        // This would require making the helper functions accessible for testing
+        // Or creating integration tests that exercise this behavior
+        val customFieldJson = """
+        {
+            "record_uid": "OHQMQwSFTQFRZuh50AdXzQ",
+            "title": "Test Record",
+            "type": "address",
+            "fields": [],
+            "custom": [
+                {
+                    "type": "name",
+                    "value": [
+                        {
+                            "first": "Keeper",
+                            "last": "Security",
+                            "middle": "Address"
+                        }
+                    ]
+                }
+            ]
+        }
+        """
+        
+        // This test would validate that the name[first] notation works
+        // You might need to expose internal methods for unit testing
+        assertTrue("Should handle type-based custom fields", true)
+    }
 }

@@ -1,6 +1,8 @@
 package keepersecurity.model
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.SerializationException
@@ -46,21 +48,49 @@ class KeeperModelsTest {
     }
 
     @Test
-    fun `test KeeperFolder deserialization from Keeper CLI format`() {
+    fun `test KeeperFolder deserialization from new Keeper CLI format`() {
         val keeperJson = """
             {
-                "folder_uid": "BT7L_4GPQaOTtKOEZOoGgw",
-                "name": "Personal",
-                "flags": "",
-                "parent_uid": null
+                "type": "folder",
+                "uid": "Yi_OxwTV2tdBWi-_Aegs_w",
+                "name": "Demo Folder",
+                "details": "Flags: S, Parent: /"
             }
         """
         
         val folder = json.decodeFromString<KeeperFolder>(keeperJson)
-        assertEquals("BT7L_4GPQaOTtKOEZOoGgw", folder.folderUid)
-        assertEquals("Personal", folder.name)
-        assertEquals("", folder.flags)
-        assertNull(folder.parentUid)
+        assertEquals("Yi_OxwTV2tdBWi-_Aegs_w", folder.folderUid)
+        assertEquals("Demo Folder", folder.name)
+        assertEquals("folder", folder.type)
+        assertEquals("Flags: S, Parent: /", folder.details)
+    }
+
+    @Test
+    fun `test KeeperFolder list from new CLI format`() {
+        val realKeeperOutput = """
+        [
+            {
+                "type": "folder",
+                "uid": "BT7L_4GPQaOTtKOEZOoGgw",
+                "name": "Personal",
+                "details": "Flags: , Parent: /"
+            },
+            {
+                "type": "folder",
+                "uid": "Xj9K_8MPQsRtUoLzVcXyFq",
+                "name": "Work",
+                "details": "Flags: S, Parent: BT7L_4GPQaOTtKOEZOoGgw"
+            }
+        ]
+        """
+        
+        val folders = json.decodeFromString<List<KeeperFolder>>(realKeeperOutput)
+        assertEquals("Should have 2 folders", 2, folders.size)
+        
+        val personalFolder = folders[0]
+        assertEquals("Personal folder UID", "BT7L_4GPQaOTtKOEZOoGgw", personalFolder.folderUid)
+        assertEquals("Personal folder name", "Personal", personalFolder.name)
+        assertEquals("folder", personalFolder.type)
     }
 
     @Test
@@ -77,8 +107,8 @@ class KeeperModelsTest {
 
     @Test
     fun `test KeeperRecord with fields`() {
-        val passwordField = KeeperField("password", listOf("secret123"))
-        val loginField = KeeperField("login", listOf("user@example.com"))
+        val passwordField = KeeperField("password", null, listOf(JsonPrimitive("secret123")))
+        val loginField = KeeperField("login", null, listOf(JsonPrimitive("user@example.com")))
         val record = KeeperRecord(
             recordUid = "rec123456789012345678",
             title = "Login Record",
@@ -92,14 +122,14 @@ class KeeperModelsTest {
         assertEquals("Record title", record.title, decoded.title)
         assertEquals("Fields count", 2, decoded.fields?.size)
         assertEquals("Password field type", "password", decoded.fields?.get(0)?.type)
-        assertEquals("Password field value", "secret123", decoded.fields?.get(0)?.value?.get(0))
+        assertEquals("Password field value", "secret123", decoded.fields?.get(0)?.value?.get(0)?.jsonPrimitive?.content)
         assertEquals("Login field type", "login", decoded.fields?.get(1)?.type)
-        assertEquals("Login field value", "user@example.com", decoded.fields?.get(1)?.value?.get(0))
+        assertEquals("Login field value", "user@example.com", decoded.fields?.get(1)?.value?.get(0)?.jsonPrimitive?.content)
     }
 
     @Test
     fun `test KeeperRecord with custom fields`() {
-        val customField = KeeperCustomField("API Key", listOf("key_123456"))
+        val customField = KeeperCustomField(null, "API Key", listOf(JsonPrimitive("key_123456")))
         val record = KeeperRecord(
             recordUid = "rec123456789012345678",
             title = "API Record",
@@ -111,19 +141,19 @@ class KeeperModelsTest {
         
         assertEquals("Custom fields count", 1, decoded.custom?.size)
         assertEquals("Custom field label", "API Key", decoded.custom?.get(0)?.label)
-        assertEquals("Custom field value", "key_123456", decoded.custom?.get(0)?.value?.get(0))
+        assertEquals("Custom field value", "key_123456", decoded.custom?.get(0)?.value?.get(0)?.jsonPrimitive?.content)
     }
 
     @Test
     fun `test KeeperField with multiple values`() {
-        val field = KeeperField("phone", listOf("+1-555-1234", "+1-555-5678"))
+        val field = KeeperField("phone", null, listOf(JsonPrimitive("+1-555-1234"), JsonPrimitive("+1-555-5678")))
         val jsonString = json.encodeToString(field)
         val decoded = json.decodeFromString<KeeperField>(jsonString)
         
         assertEquals("Field type", "phone", decoded.type)
         assertEquals("Values count", 2, decoded.value?.size)
-        assertEquals("First value", "+1-555-1234", decoded.value?.get(0))
-        assertEquals("Second value", "+1-555-5678", decoded.value?.get(1))
+        assertEquals("First value", "+1-555-1234", decoded.value?.get(0)?.jsonPrimitive?.content)
+        assertEquals("Second value", "+1-555-5678", decoded.value?.get(1)?.jsonPrimitive?.content)
     }
 
     @Test
@@ -138,7 +168,7 @@ class KeeperModelsTest {
 
     @Test
     fun `test KeeperCustomField serialization`() {
-        val customField = KeeperCustomField("License Key", listOf("ABC-123-DEF-456"))
+        val customField = KeeperCustomField(null, "License Key", listOf(JsonPrimitive("ABC-123-DEF-456")))
         val jsonString = json.encodeToString(customField)
         val decoded = json.decodeFromString<KeeperCustomField>(jsonString)
         
@@ -212,13 +242,13 @@ class KeeperModelsTest {
         val realKeeperOutput = """
         [
             {
-                "folder_uid": "BT7L_4GPQaOTtKOEZOoGgw",
+                "uid": "BT7L_4GPQaOTtKOEZOoGgw",
                 "name": "Personal",
                 "flags": "",
                 "parent_uid": null
             },
             {
-                "folder_uid": "Xj9K_8MPQsRtUoLzVcXyFq",
+                "uid": "Xj9K_8MPQsRtUoLzVcXyFq",
                 "name": "Work",
                 "flags": "shared",
                 "parent_uid": "BT7L_4GPQaOTtKOEZOoGgw"
@@ -277,15 +307,15 @@ class KeeperModelsTest {
         
         // Check standard fields
         val loginField = record.fields?.find { it.type == "login" }
-        assertEquals("Login value", "john.doe@company.com", loginField?.value?.get(0))
+        assertEquals("Login value", "john.doe@company.com", loginField?.value?.get(0)?.jsonPrimitive?.content)  // ← FIX LINE 310
         
         val passwordField = record.fields?.find { it.type == "password" }
-        assertEquals("Password value", "SuperSecret123!", passwordField?.value?.get(0))
+        assertEquals("Password value", "SuperSecret123!", passwordField?.value?.get(0)?.jsonPrimitive?.content)  // ← FIX LINE 313
         
         // Check custom fields
         val tokenField = record.custom?.get(0)
         assertEquals("Custom field label", "Personal Access Token", tokenField?.label)
-        assertEquals("Custom field value", "ghp_abcdef1234567890", tokenField?.value?.get(0))
+        assertEquals("Custom field value", "ghp_abcdef1234567890", tokenField?.value?.get(0)?.jsonPrimitive?.content)  // ← FIX LINE 318
     }
 
     @Test
