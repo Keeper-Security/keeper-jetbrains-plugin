@@ -135,12 +135,12 @@ jobs:
       - name: Checkout Source 
         uses: actions/checkout@v4
       - name: Setup Java 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: temurin
+          distribution: 'zulu'
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/actions/setup-gradle@v4
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -177,12 +177,13 @@ jobs:
             "https://plugins.jetbrains.com/api/plugins/$PLUGIN_ID/updates")
           if echo "$RESPONSE" | grep -q "\"version\":\"$VERSION\""; then
             echo "Version $VERSION already exists on JetBrains Marketplace. Skipping publish."
-            exit 0
+            echo "should_publish=false" >> $GITHUB_OUTPUT
           else
             echo "Version $VERSION not found. Proceeding with publish."
+            echo "should_publish=true" >> $GITHUB_OUTPUT
           fi
       - name: Publish to JetBrains Marketplace
-        if: github.event.inputs.publish == 'true' && success() && steps.check-version.outcome == 'success'
+        if: github.event.inputs.publish == 'true' && steps.check-version.outputs.should_publish == 'true'
         env:
           PUBLISH_TOKEN: '${{ steps.ksmsecrets.outputs.MARKETPLACE_TOKEN }}'
           CERTIFICATE_CHAIN: '${{ github.workspace }}/certificate_chain.crt'
@@ -190,7 +191,11 @@ jobs:
           PRIVATE_KEY_PASSWORD: '${{ steps.ksmsecrets.outputs.PRIVATE_KEY_PASSWORD }}'
         run: |
           echo "Publishing Keeper Security JetBrains Plugin v${{ steps.version.outputs.plugin_version }}..."
-          ./gradlew publishPlugin -Pintellij.publish.token=$PUBLISH_TOKEN
+          ./gradlew signPlugin publishPlugin \
+            -Pintellij.publish.token=$PUBLISH_TOKEN \
+            -PsignPlugin.certificateChain=$CERTIFICATE_CHAIN \
+            -PsignPlugin.privateKey=$PRIVATE_KEY \
+            -PsignPlugin.password=$PRIVATE_KEY_PASSWORD
       - name: Upload plugin artifact for testing
         if: ${{ github.event.inputs.publish == 'false' }}
         uses: actions/upload-artifact@v4
@@ -198,7 +203,7 @@ jobs:
           name: jetbrains-plugin-${{ github.run_number }}
           path: ./artifacts/*.zip
       - name: Create Release Summary
-        if: github.event.inputs.publish == 'true' && success() && steps.check-version.outcome == 'success'
+        if: github.event.inputs.publish == 'true' && steps.check-version.outputs.should_publish == 'true'
         env:
           VERSION: '${{ steps.version.outputs.plugin_version }}'
         run: |
