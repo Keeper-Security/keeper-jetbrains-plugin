@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.keepersecurity.jetbrains</id>
-    <name>Keeper Vault JetBrains Plugin</name>
-    <vendor>JetBrains</vendor>
+    <name>Keeper Security</name>
+    <vendor email="ops@keepersecurity.com" url="https://www.keepersecurity.com">Keeper Security</vendor>
 
     <depends>com.intellij.modules.platform</depends>
 

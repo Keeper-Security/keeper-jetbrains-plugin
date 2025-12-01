@@ -51,8 +51,10 @@ The goal is to enable developers to manage secrets securely without leaving thei
 ## Setup
 
 ### 1. Install the Plugin
-- From JetBrains Marketplace: Search "Keeper Security" (when published)
-- Or install manually from plugin file
+- Open your JetBrains IDE (IntelliJ IDEA, PyCharm, WebStorm, etc.)
+- Go to **File → Settings → Plugins** (or **IntelliJ IDEA → Preferences → Plugins** on macOS)
+- Search for "**Keeper Security**" in the Marketplace tab
+- Click **Install** and restart your IDE
 
 ### 2. Install Keeper Commander CLI
 - Follow the [Keeper Commander Installation Guide](https://docs.keeper.io/commander/)
