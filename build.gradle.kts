@@ -94,6 +94,9 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            providers.gradleProperty("pluginUntilBuild").orElse("").get().takeIf { it.isNotBlank() }?.let {
+                untilBuild = it
+            }
         }
     }
 
@@ -113,10 +116,12 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
-            // Optionally verify against additional IDEs:
-            // ide("IC", "2024.3.6")
-            // ide("IU", "2024.3.6")
+            // Verify against the base platform version
+            create(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
+            // Verify against newer IDE versions to catch compatibility issues early
+            create("IU", "2024.3.7")
+            create("IU", "2025.1.7")
+            create("IU", "2025.2.5")
         }
     }
 }
