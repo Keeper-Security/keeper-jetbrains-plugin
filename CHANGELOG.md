@@ -1,6 +1,6 @@
 # Keeper Security JetBrains Plugin Changelog
 
-## [1.0.1] - 2025-12-02
+## [Unreleased]
 
 ### Fixed
 - Fixed deprecated API usage: Replaced `FileChooserDescriptorFactory.createSingleFileDescriptor()` with `FileChooserDescriptor` constructor
