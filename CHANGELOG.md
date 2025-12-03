@@ -1,5 +1,15 @@
 # Keeper Security JetBrains Plugin Changelog
 
+## [Unreleased]
+
+### Fixed
+- Fixed deprecated API usage: Replaced `FileChooserDescriptorFactory.createSingleFileDescriptor()` with `FileChooserDescriptor` constructor
+- Improved compatibility with IntelliJ IDEA 2025.1.x and 2025.2.x versions
+- Resolved compatibility warnings that appeared during marketplace verification
+
+### Technical Improvements
+- Updated build configuration to use non-deprecated API methods
+
 ## [1.0.0] - 2025-01-20
 
 ### Added

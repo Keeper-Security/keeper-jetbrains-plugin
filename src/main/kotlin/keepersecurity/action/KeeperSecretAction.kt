@@ -13,7 +13,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 
 import com.intellij.openapi.fileChooser.FileChooser
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.vfs.VfsUtilCore
 
 import java.io.File
@@ -159,7 +159,7 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
     }
 
     private fun browseForEnvFile(project: Project): File? {
-        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
+        val descriptor = FileChooserDescriptor(true, false, false, true, false, true).apply {
             title = "Select .env File"
             withFileFilter { vf ->
                 val name = vf.name
