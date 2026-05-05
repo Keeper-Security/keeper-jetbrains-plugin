@@ -19,7 +19,7 @@ class KeeperSecureRunProfileState(
     override fun execute(executor: Executor, programRunner: ProgramRunner<*>): ExecutionResult {
         val project = environment.project
         val base = project.basePath ?: throw ExecutionException("Project has no base path")
-        val opts = configuration.getOptions() as KeeperSecureRunConfigurationOptions
+        val opts = configuration.options
         val envFile = KeeperSecurePathUtil.resolveToFile(opts.envFilePath.orEmpty(), base)
         val wdPath = opts.workingDirectoryPath.orEmpty().trim()
         val workDir = if (wdPath.isEmpty()) {

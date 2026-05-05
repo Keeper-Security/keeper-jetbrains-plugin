@@ -5,7 +5,6 @@ import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import java.io.File
@@ -31,7 +30,7 @@ class KeeperSecureProcessHandler(
 
     override fun startNotify() {
         super.startNotify()
-        object : Task.Backgroundable(project, "Run Keeper Securely", true) {
+        object : Task.Backgroundable(project, "Run Keeper securely", true) {
             override fun run(indicator: ProgressIndicator) {
                 try {
                     val result = KeeperSecureScriptRunner.run(

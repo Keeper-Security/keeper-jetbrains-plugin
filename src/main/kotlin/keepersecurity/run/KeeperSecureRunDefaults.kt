@@ -59,7 +59,7 @@ object KeeperSecureRunDefaults {
 
     private fun detectPythonEntryScriptRelative(base: File): String? {
         for (name in listOf("main.py", "app.py", "run.py")) {
-            if (File(base, name).isFile()) {
+            if (File(base, name).isFile) {
                 return name
             }
         }

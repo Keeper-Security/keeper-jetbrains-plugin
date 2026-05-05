@@ -33,7 +33,7 @@ class KeeperSecureRunConfigurationType : ConfigurationTypeBase(
         override fun configureDefaultSettings(settings: RunnerAndConfigurationSettings) {
             super.configureDefaultSettings(settings)
             val cfg = settings.configuration as? KeeperSecureRunConfiguration ?: return
-            KeeperSecureRunDefaults.applyDefaults(cfg.project, cfg.getOptions())
+            KeeperSecureRunDefaults.applyDefaults(cfg.project, cfg.options)
         }
     }
 }

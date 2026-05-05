@@ -10,7 +10,8 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JTextField
 
-class KeeperSecureRunConfigurationEditor(private val project: Project) : SettingsEditor<KeeperSecureRunConfiguration>() {
+class KeeperSecureRunConfigurationEditor(@Suppress("UNUSED_PARAMETER") project: Project) :
+    SettingsEditor<KeeperSecureRunConfiguration>() {
 
     private val envFileField = TextFieldWithBrowseButton()
     private val workingDirField = TextFieldWithBrowseButton()
@@ -41,15 +42,15 @@ class KeeperSecureRunConfigurationEditor(private val project: Project) : Setting
         .panel
 
     override fun applyEditorTo(s: KeeperSecureRunConfiguration) {
-        val o = s.getOptions() as KeeperSecureRunConfigurationOptions
-        val env = envFileField.text?.trim().orEmpty().ifBlank { ".env" }
+        val o = s.options
+        val env = envFileField.text.trim().ifBlank { ".env" }
         o.envFilePath = env
-        o.workingDirectoryPath = workingDirField.text?.trim().orEmpty()
-        o.command = commandField.text?.trim().orEmpty()
+        o.workingDirectoryPath = workingDirField.text.trim()
+        o.command = commandField.text.trim()
     }
 
     override fun resetEditorFrom(s: KeeperSecureRunConfiguration) {
-        val o = s.getOptions() as KeeperSecureRunConfigurationOptions
+        val o = s.options
         envFileField.text = (o.envFilePath ?: "").ifBlank { ".env" }
         workingDirField.text = o.workingDirectoryPath.orEmpty()
         commandField.text = o.command.orEmpty()

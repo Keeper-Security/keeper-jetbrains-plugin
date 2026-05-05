@@ -323,7 +323,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
     private fun httpKeeperDynamicVariableSnippet(recordUid: String, fieldPath: String): String {
         val uidEsc = recordUid.replace("\\", "\\\\").replace("\"", "\\\"")
         val fieldEsc = fieldPath.replace("\\", "\\\\").replace("\"", "\\\"")
-        return "{{" + '$' + "keeper(\"$uidEsc\",\"$fieldEsc\")}}"
+        return "{{\$keeper(\"$uidEsc\",\"$fieldEsc\")}}"
     }
 
     private fun buildInsertionSuccessMessage(insertText: String, keeperNotation: String): String {

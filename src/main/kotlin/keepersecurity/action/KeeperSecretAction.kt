@@ -3,7 +3,6 @@ package keepersecurity.action
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -20,11 +19,9 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import java.io.File
 import javax.swing.JScrollPane
 import javax.swing.JTextArea
-import kotlinx.serialization.ExperimentalSerializationApi
 
 import keepersecurity.run.KeeperSecureScriptRunner
 
-@OptIn(ExperimentalSerializationApi::class)
 class KeeperSecretAction : AnAction("Run Keeper Securely") {
     private val logger = thisLogger()
 
