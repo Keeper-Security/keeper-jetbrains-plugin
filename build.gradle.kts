@@ -61,6 +61,9 @@ dependencies {
 
 
 // Configure IntelliJ Platform Gradle Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
+//
+// Run Gradle on JDK 21 — Eclipse Temurin or JetBrains Runtime (IDE → Settings → Build → Gradle → Gradle JVM).
+// Matches kotlin.jvmToolchain(21).
 intellijPlatform {
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")

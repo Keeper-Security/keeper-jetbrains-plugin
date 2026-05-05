@@ -4,12 +4,18 @@
     <vendor email="ops@keepersecurity.com" url="https://www.keepersecurity.com">Keeper Security</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <!-- Python: optional; enables reading project/module Python SDK for Run Keeper Securely defaults when PyCharm / Python plugin is present -->
+    <depends optional="true">com.intellij.modules.python</depends>
+    <!-- HTTP Client (Ultimate / WebStorm / etc.); optional so IC installs without it still load the plugin -->
+    <depends optional="true" config-file="keeper-http-client.xml">com.jetbrains.restClient</depends>
 
     <resource-bundle>messages.KeeperSecurity</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- Startup activities -->
         <projectActivity implementation="keepersecurity.service.KeeperStartupActivity" />
+        <!-- Run | Edit Configurations → Run Keeper Securely -->
+        <configurationType implementation="keepersecurity.run.KeeperSecureRunConfigurationType"/>
     </extensions>
 
     <actions>
@@ -60,7 +66,7 @@
         <action id="keepersecurity.action.KeeperGetSecretAction"
                 class="keepersecurity.action.KeeperGetSecretAction"
                 text="Get Keeper Secret"
-                description="Choose a Keeper record and insert its field reference into the editor">
+                description="Choose a Keeper record and field; inserts keeper:// in .env/scripts or {{$keeper(...)}} in .http files">
                 <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
         </action>
 
@@ -104,7 +110,7 @@
             <action id="keepersecurity.action.KeeperGetSecretActionEditor"
                 class="keepersecurity.action.KeeperGetSecretAction"
                 text="Get Keeper Secret"
-                description="Choose a Keeper record and insert its field reference"/>
+                description="Choose a Keeper record and field; inserts keeper:// or HTTP Client {{$keeper(...)}}"/>
 
             <!-- Generate Keeper Secrets action (Editor popup) -->
             <action id="keepersecurity.action.KeeperGenerateSecretsActionEditor"

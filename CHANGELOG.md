@@ -1,5 +1,15 @@
 # Keeper Security JetBrains Plugin Changelog
 
+## [1.1.0] - 2026-05-05
+
+### Added
+- **Run Keeper Securely** as a saved run configuration (**Run → Edit Configurations**): `.env` path, working directory, command, output in the Run tool window; defaults for Python SDK / venv and common entry scripts when creating a new configuration
+- **JetBrains HTTP Client** integration for `.http` files: `{{ $keeper("recordUid", "field") }}` dynamic variable (where HTTP Client is bundled); **Get Keeper Secret** inserts the snippet in `.http` / `.rest` files
+- Shared **`KeeperSecureScriptRunner`** pipeline for Tools → Run Keeper Securely and the run configuration
+
+### Changed
+- README: documents HTTP Client, run configurations, prerequisites, and links to GitHub issues [#9](https://github.com/Keeper-Security/keeper-jetbrains-plugin/issues/9) / [#11](https://github.com/Keeper-Security/keeper-jetbrains-plugin/issues/11)
+
 ## [1.0.0] - 2025-01-20
 
 ### Added

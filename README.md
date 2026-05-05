@@ -1,7 +1,7 @@
 # Keeper Security JetBrains Plugin
 
 <!-- Plugin description -->
-A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow. The plugin provides secure secret management capabilities including saving, retrieving, generating, and running commands with secrets from Keeper Security vault.
+A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow. Use Keeper references in `.env` files and in **JetBrains HTTP Client** (`.http` files) where supported, save **Run Keeper Securely** run configurations, and use Tools-menu actions to manage secrets without pasting plaintext into your project.
 
 The goal is to enable developers to manage secrets securely without leaving their development environment, while maintaining the highest security standards and providing seamless integration with existing Keeper Security infrastructure.
 
@@ -16,13 +16,14 @@ The goal is to enable developers to manage secrets securely without leaving thei
 - [Usage](#usage)
   - [Available Actions](#available-actions)
   - [Command Details](#command-details)
+  - [JetBrains HTTP Client (.http files)](#jetbrains-http-client-http-files)
 - [Troubleshooting](#troubleshooting)
 - [Common Issues](#common-issues)
 - [License](#license)
 
 ## Overview
 
-A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow. The plugin provides secure secret management capabilities including saving, retrieving, generating, and running commands with secrets from Keeper Security vault.
+A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow: secret references in `.env` and **HTTP Client** requests, **Run Keeper Securely** from the Tools menu or as a saved run configuration, and vault actions from the editor.
 
 The goal is to enable developers to manage secrets securely without leaving their development environment, while maintaining the highest security standards and providing seamless integration with existing Keeper Security infrastructure.
 
@@ -32,6 +33,8 @@ The goal is to enable developers to manage secrets securely without leaving thei
 
 - **Secret Management**: Save, retrieve, and generate secrets directly from JetBrains IDEs using Keeper Security vault
 - **Secure Execution**: Run commands with secrets injected from Keeper vault through `.env` file processing
+- **JetBrains HTTP Client** (optional): Reference vault values in `.http` files via the `$keeper(...)` dynamic variable where the HTTP Client plugin is bundled (e.g. IntelliJ IDEA Ultimate)
+- **Run configurations**: Save a **Run Keeper Securely** configuration (`.env` path, working directory, command) under **Run → Edit Configurations** with output in the Run tool window
 - **Fast Performance**: Uses persistent Keeper shell for blazing-fast secret operations
 - **Folder Management**: Select and manage Keeper vault folders for organized secret storage
 - **Record Operations**: Create new records, update existing ones, and retrieve field references
@@ -45,8 +48,9 @@ The goal is to enable developers to manage secrets securely without leaving thei
   - Authenticate using persistent login or biometric login
 - **Keeper Security Account**: Active subscription with vault access
 - **System Requirements**:
-  - JetBrains IDE: 2021.1 or later
-  - Java: 11 or later
+  - JetBrains IDE: 2021.1 or later (see `pluginSinceBuild` in the plugin for the exact minimum)
+  - **HTTP Client** features require an IDE distribution that bundles the JetBrains HTTP Client (optional dependency); IntelliJ IDEA Community Edition does not include it by default
+- **Building this plugin from source**: JDK **21** (Eclipse Temurin or JetBrains Runtime recommended for Gradle)
 
 ## Setup
 
@@ -90,7 +94,7 @@ All Keeper actions are available through two locations:
 | Update Keeper Record | Update existing vault record and replace text | Modify existing secret values |
 | Generate Keeper Secret | Generate secure passwords and store in vault | Create new secure credentials |
 | Get Keeper Folder | Select vault folder for organized storage | Choose storage location for new records |
-| Run Keeper Securely | Execute commands with injected secrets from .env | Run applications with vault credentials |
+| Run Keeper Securely | Run a command with secrets from `.env` (Tools menu or saved run configuration) | Run applications or scripts with vault-backed env vars |
 
 ### Command Details
 
@@ -104,15 +108,15 @@ All Keeper actions are available through two locations:
 4. Use this if other commands fail or for initial setup verification
 
 #### Get Keeper Secret  
-**Purpose**: Insert existing Keeper Security secrets into your code without exposing actual values.
+**Purpose**: Insert existing Keeper Security secrets into your code or HTTP requests without exposing actual values.
 
 **Steps**:
-1. Position cursor where you want to insert the secret reference
+1. Position cursor where you want to insert the secret reference (including inside a `.http` file, when using HTTP Client)
 2. Right-click → `Get Keeper Secret` or `Tools → Keeper Vault → Get Keeper Secret`
 3. Plugin shows list of available vault records
 4. Select the specific record you want to use
 5. Choose the field from that record
-6. Plugin inserts secret reference at cursor position
+6. Plugin inserts the appropriate reference at the cursor (e.g. `keeper://…` in `.env`/code, or an HTTP Client snippet in `.http` files where supported)
 
 **Reference Format**: `keeper://record-uid/field/field-name`
 
@@ -185,17 +189,22 @@ admin_password: keeper://generated-record-uid/field/password
 4. Future `Add Keeper Record` and `Generate Keeper Secret` operations will use this folder
 
 #### Run Keeper Securely
-**Purpose**: Run commands with secrets injected from Keeper Security vault through `.env` file processing.
+**Purpose**: Run commands with secrets injected from Keeper Security vault through `.env` file processing (`keeper://…` references are resolved at run time).
 
-**Steps**:
-1. Ensure your project has a `.env` file with `keeper://` references
-2. Open any file in your project
-3. Right-click → `Run Keeper Securely`
-4. Select or confirm the `.env` file to use
-5. Enter the command to run (e.g., `python3 app.py`)
-6. Plugin fetches actual secret values from vault
-7. Creates terminal with injected environment variables
-8. Executes your command with real secret values
+**Two ways to run**:
+
+1. **Tools menu / editor (interactive)**  
+   1. Ensure your project has a `.env` file with `keeper://` references.  
+   2. Open a file in the project (e.g. your script).  
+   3. **Tools → Keeper Vault → Run Keeper Securely** or right-click → **Run Keeper Securely**.  
+   4. Choose the `.env` file and enter the command (defaults suggest your current file name).  
+   5. The plugin resolves secrets, runs the command, and shows output in a dialog when successful.
+
+2. **Saved run configuration (recommended for repeat runs)**  
+   1. **Run → Edit Configurations… → + → Run Keeper Securely**.  
+   2. Set **Environment file** (`.env`), **Working directory** (optional; empty = project root), and **Command** (e.g. `python main.py`).  
+   3. Run with the usual Run/Debug actions; output appears in the **Run** tool window.  
+   New configurations may prefill the Python interpreter (project SDK or venv) and common entry scripts (`main.py` / `app.py` / `run.py`) when those are present.
 
 **Example `.env` file**:
 ```env
@@ -204,14 +213,27 @@ API_KEY=keeper://api-record-uid/field/key
 SECRET_KEY=keeper://app-record-uid/field/secret
 ```
 
-**Command execution**:
+**Command execution** (conceptually):
 ```bash
-# Plugin runs your command with actual values injected
+# After resolution, your process receives real env values
 python3 app.py
-# DATABASE_URL=postgresql://user:pass@host:5432/db
-# API_KEY=ak_live_1234567890abcdef  
-# SECRET_KEY=super-secret-key-value
 ```
+
+### JetBrains HTTP Client (.http files)
+
+Where the **HTTP Client** plugin is available (bundled with many Ultimate-tier IDEs), you can reference Keeper values directly in `.http` files using the **`$keeper`** dynamic variable:
+
+```http
+### Example
+GET https://api.example.com/v1/resource
+Authorization: Bearer {{ $keeper("RECORD_UID", "password") }}
+```
+
+- Same record UID and field names as in `keeper://UID/field/...` references.  
+- Use **Get Keeper Secret** in a `.http` file to insert the correct snippet.  
+- On IDEs **without** HTTP Client, this extension is not loaded; the rest of the plugin still works.
+
+See GitHub issues [#11](https://github.com/Keeper-Security/keeper-jetbrains-plugin/issues/11) (HTTP Client) and [#9](https://github.com/Keeper-Security/keeper-jetbrains-plugin/issues/9) (run configurations).
 
 ## Troubleshooting
 
@@ -278,9 +300,9 @@ If you encounter issues, enable detailed logging:
 **Solutions**:
 - Verify your `.env` file contains valid `keeper://` references
 - Ensure all referenced secrets exist in your vault
-- Check that plugin created the terminal correctly
+- For **Run → Run Keeper Securely**, confirm paths and working directory in **Edit Configurations**
+- For the **Tools** menu flow, check the result dialog and logs if the command fails
 - Verify the command syntax is correct for your system
-- Ensure no other terminals are interfering with environment variables
 
 #### 7. Plugin Performance Issues
 **Problem**: Commands are slow or hang
