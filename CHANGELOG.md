@@ -1,6 +1,6 @@
 # Keeper Security JetBrains Plugin Changelog
 
-## [1.1.0] - 2026-05-05
+## [Unreleased]
 
 ### Added
 - **Run Keeper Securely** as a saved run configuration (**Run → Edit Configurations**): `.env` path, working directory, command, output in the Run tool window; defaults for Python SDK / venv and common entry scripts when creating a new configuration
