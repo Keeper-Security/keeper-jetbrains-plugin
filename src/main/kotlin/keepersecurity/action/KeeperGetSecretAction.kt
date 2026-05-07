@@ -5,11 +5,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.vfs.VirtualFile
 import keepersecurity.service.KeeperShellService
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
@@ -259,21 +261,22 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
 
                                 val selectedFieldKey = fieldOptions.find { it.first == selectedFieldDisplay }?.second ?: return@invokeLater
                                 val keeperNotation = "keeper://$selectedUid/field/$selectedFieldKey"
+                                val insertText = insertionTextForCurrentFile(editor, selectedUid, selectedFieldKey, keeperNotation)
 
-                                logger.info("Generated keeper notation: $keeperNotation")
+                                logger.info("Insert text for editor: ${insertText.take(120)}…")
 
                                 // Step 5: Insert into editor (UI write action)
                                 WriteCommandAction.runWriteCommandAction(project) {
                                     val doc = editor.document
                                     val caretOffset = editor.caretModel.offset
-                                    doc.insertString(caretOffset, keeperNotation)
+                                    doc.insertString(caretOffset, insertText)
                                 }
 
                                 // Show success message
                                 Messages.showInfoMessage(
                                     project,
-                                    "Keeper reference inserted!\n\n$keeperNotation",
-                                    "Keeper Reference Added"
+                                    buildInsertionSuccessMessage(insertText, keeperNotation),
+                                    "Keeper Reference Added",
                                 )
                             }
                         }
@@ -288,6 +291,48 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
         ignoreUnknownKeys = true
         isLenient = true
         allowTrailingComma = true
+    }
+
+    /**
+     * In JetBrains HTTP Client files (`.http` / `.rest`), insert the `$keeper` dynamic variable
+     * so users do not need to paste the record UID manually. Elsewhere, keep `keeper://…` for .env and scripts.
+     */
+    private fun insertionTextForCurrentFile(
+        editor: Editor,
+        recordUid: String,
+        fieldPath: String,
+        keeperUriNotation: String,
+    ): String {
+        val file = FileDocumentManager.getInstance().getFile(editor.document) ?: return keeperUriNotation
+        return if (isHttpClientRequestFile(file)) {
+            httpKeeperDynamicVariableSnippet(recordUid, fieldPath)
+        } else {
+            keeperUriNotation
+        }
+    }
+
+    private fun isHttpClientRequestFile(file: VirtualFile): Boolean {
+        val ext = file.extension ?: return false
+        return ext.equals("http", ignoreCase = true) || ext.equals("rest", ignoreCase = true)
+    }
+
+    /**
+     * Snippet for HTTP Client: no space after `{{` (see JetBrains HTTP Client variable docs).
+     * Escapes backslashes and double quotes inside UID / field path.
+     */
+    private fun httpKeeperDynamicVariableSnippet(recordUid: String, fieldPath: String): String {
+        val uidEsc = recordUid.replace("\\", "\\\\").replace("\"", "\\\"")
+        val fieldEsc = fieldPath.replace("\\", "\\\\").replace("\"", "\\\"")
+        return "{{\$keeper(\"$uidEsc\",\"$fieldEsc\")}}"
+    }
+
+    private fun buildInsertionSuccessMessage(insertText: String, keeperNotation: String): String {
+        val isHttpSnippet = insertText.startsWith("{{") && insertText.contains("keeper(")
+        return if (isHttpSnippet) {
+            "HTTP Client variable inserted (record and field chosen from the list — no UID to type).\n\n$insertText"
+        } else {
+            "Keeper reference inserted!\n\n$keeperNotation"
+        }
     }
 
     private fun showError(project: Project, message: String) {
