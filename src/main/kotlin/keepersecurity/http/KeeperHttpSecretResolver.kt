@@ -19,12 +19,16 @@ object KeeperHttpSecretResolver {
 
     /**
      * Fetches a Keeper record via the persistent shell and returns the requested field value.
+     *
+     * Throws on any failure (invalid input, missing field, shell error). The HTTP Client surfaces
+     * the throw as a variable-resolution error and skips the request, rather than substituting the
+     * error message into the URL, headers, or body.
      */
     fun resolveRecordField(recordUid: String, fieldPath: String, logger: Logger): String {
         val trimmedUid = recordUid.trim()
         val trimmedField = fieldPath.trim()
         if (trimmedUid.isEmpty() || trimmedField.isEmpty()) {
-            return "[Keeper] record UID and field path must be non-empty"
+            throw IllegalArgumentException("Keeper record UID and field path must be non-empty")
         }
 
         return try {
@@ -35,10 +39,12 @@ object KeeperHttpSecretResolver {
                 trimmedField,
                 logger,
             )
-            extracted ?: "[Keeper] Field '$trimmedField' not found in record $trimmedUid"
+            extracted ?: throw IllegalStateException(
+                "Keeper field '$trimmedField' not found in record $trimmedUid",
+            )
         } catch (e: Exception) {
             logger.warn("Keeper HTTP variable resolution failed: ${e.message}", e)
-            "[Keeper] ${e.message ?: e::class.simpleName}"
+            throw e
         }
     }
 

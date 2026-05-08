@@ -1,6 +1,5 @@
 package keepersecurity.run
 
-import com.intellij.execution.RunnerAndConfigurationSettings
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationTypeBase
 import com.intellij.execution.configurations.RunConfiguration
@@ -29,11 +28,5 @@ class KeeperSecureRunConfigurationType : ConfigurationTypeBase(
         override fun getName(): String = "Run Keeper Securely"
 
         override fun isConfigurationSingletonByDefault(): Boolean = false
-
-        override fun configureDefaultSettings(settings: RunnerAndConfigurationSettings) {
-            super.configureDefaultSettings(settings)
-            val cfg = settings.configuration as? KeeperSecureRunConfiguration ?: return
-            KeeperSecureRunDefaults.applyDefaults(cfg.project, cfg.options)
-        }
     }
 }
