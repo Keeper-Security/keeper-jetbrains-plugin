@@ -31,11 +31,7 @@ object KeeperSecureScriptRunner {
     }
 
     /** Hard ceiling on a single Run Keeper Securely invocation; the Stop button kicks in earlier. */
-    private const val SCRIPT_HARD_TIMEOUT_SECONDS: Long = 24L * 60L * 60L
-
-    /** Maximum time to wait for the persistent shell prompt to appear after startShell(). */
-    private const val SHELL_READY_POLL_TIMEOUT_MS: Long = 30_000L
-    private const val SHELL_READY_POLL_INTERVAL_MS: Long = 200L
+    private const val SCRIPT_HARD_TIMEOUT_SECONDS: Long = 60L * 60L
 
     data class ExecutionResult(
         val replacements: Int,
@@ -80,6 +76,7 @@ object KeeperSecureScriptRunner {
         }
 
         if (!isKeeperReady(logger)) {
+            if (indicator.isCanceled) throw ProcessCanceledException()
             return ExecutionResult(
                 0,
                 listOf("Keeper is not ready. Run 'Check Keeper Authorization' first."),
@@ -87,6 +84,7 @@ object KeeperSecureScriptRunner {
                 -1,
             )
         }
+        if (indicator.isCanceled) throw ProcessCanceledException()
 
         val envVars = mutableMapOf<String, String>()
         logger.info("Found ${keeperRefs.size} Keeper references to process")
@@ -240,8 +238,6 @@ object KeeperSecureScriptRunner {
                     logger.error("Failed to start Keeper shell")
                     return false
                 }
-                logger.info("Shell started; polling until prompt appears...")
-                pollUntilShellPromptSeen(SHELL_READY_POLL_TIMEOUT_MS, logger)
             }
 
             // Liveness check only. KeeperShellService.executeCommand strips the prompt strings
@@ -262,31 +258,5 @@ object KeeperSecureScriptRunner {
             logger.debug("Full exception details", ex)
             false
         }
-    }
-
-    /**
-     * Polls [KeeperShellService.getLastStartupOutput] for one of the known prompt strings;
-     * returns as soon as the prompt is seen, or when [maxWaitMs] elapses.
-     */
-    private fun pollUntilShellPromptSeen(maxWaitMs: Long, logger: Logger): Boolean {
-        val start = System.currentTimeMillis()
-        while (System.currentTimeMillis() - start < maxWaitMs) {
-            val out = KeeperShellService.getLastStartupOutput()
-            if (out.contains("My Vault>") ||
-                out.contains("Keeper>") ||
-                out.contains("Not logged in>")
-            ) {
-                logger.info("Shell prompt detected after ${System.currentTimeMillis() - start}ms")
-                return true
-            }
-            try {
-                Thread.sleep(SHELL_READY_POLL_INTERVAL_MS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return false
-            }
-        }
-        logger.warn("Shell prompt not seen within ${maxWaitMs}ms")
-        return false
     }
 }
