@@ -1,10 +1,12 @@
 package keepersecurity.action
 
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
@@ -261,7 +263,8 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
 
                                 val selectedFieldKey = fieldOptions.find { it.first == selectedFieldDisplay }?.second ?: return@invokeLater
                                 val keeperNotation = "keeper://$selectedUid/field/$selectedFieldKey"
-                                val insertText = insertionTextForCurrentFile(editor, selectedUid, selectedFieldKey, keeperNotation)
+                                val isHttpFile = isHttpClientRequestFile(editor)
+                                val insertText = insertionTextFor(isHttpFile, selectedUid, selectedFieldKey, keeperNotation)
 
                                 logger.info("Insert text for editor: ${insertText.take(120)}…")
 
@@ -275,7 +278,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                                 // Show success message
                                 Messages.showInfoMessage(
                                     project,
-                                    buildInsertionSuccessMessage(insertText, keeperNotation),
+                                    buildInsertionSuccessMessage(isHttpFile, insertText, keeperNotation),
                                     "Keeper Reference Added",
                                 )
                             }
@@ -297,23 +300,35 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
      * In JetBrains HTTP Client files (`.http` / `.rest`), insert the `$keeper` dynamic variable
      * so users do not need to paste the record UID manually. Elsewhere, keep `keeper://…` for .env and scripts.
      */
-    private fun insertionTextForCurrentFile(
-        editor: Editor,
+    private fun insertionTextFor(
+        isHttpFile: Boolean,
         recordUid: String,
         fieldPath: String,
         keeperUriNotation: String,
-    ): String {
-        val file = FileDocumentManager.getInstance().getFile(editor.document) ?: return keeperUriNotation
-        return if (isHttpClientRequestFile(file)) {
-            httpKeeperDynamicVariableSnippet(recordUid, fieldPath)
-        } else {
-            keeperUriNotation
+    ): String = if (isHttpFile) {
+        httpKeeperDynamicVariableSnippet(recordUid, fieldPath)
+    } else {
+        keeperUriNotation
+    }
+
+    /**
+     * Detects HTTP Client request files via the FileType API. The `com.jetbrains.restClient`
+     * plugin is an optional dependency, so its classes are only on the classpath when it is
+     * loaded; the plugin check plus the try/catch keep the call safe on IDEs that do not bundle it.
+     */
+    private fun isHttpClientRequestFile(editor: Editor): Boolean {
+        val file: VirtualFile = FileDocumentManager.getInstance().getFile(editor.document) ?: return false
+        if (!isHttpClientPluginEnabled()) return false
+        return try {
+            file.fileType == com.intellij.httpClient.http.request.HttpRequestFileType.INSTANCE
+        } catch (_: Throwable) {
+            false
         }
     }
 
-    private fun isHttpClientRequestFile(file: VirtualFile): Boolean {
-        val ext = file.extension ?: return false
-        return ext.equals("http", ignoreCase = true) || ext.equals("rest", ignoreCase = true)
+    private fun isHttpClientPluginEnabled(): Boolean {
+        val descriptor = PluginManagerCore.getPlugin(PluginId.getId("com.jetbrains.restClient"))
+        return descriptor != null && descriptor.isEnabled
     }
 
     /**
@@ -326,13 +341,14 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
         return "{{\$keeper(\"$uidEsc\",\"$fieldEsc\")}}"
     }
 
-    private fun buildInsertionSuccessMessage(insertText: String, keeperNotation: String): String {
-        val isHttpSnippet = insertText.startsWith("{{") && insertText.contains("keeper(")
-        return if (isHttpSnippet) {
-            "HTTP Client variable inserted (record and field chosen from the list — no UID to type).\n\n$insertText"
-        } else {
-            "Keeper reference inserted!\n\n$keeperNotation"
-        }
+    private fun buildInsertionSuccessMessage(
+        isHttpSnippet: Boolean,
+        insertText: String,
+        keeperNotation: String,
+    ): String = if (isHttpSnippet) {
+        "HTTP Client variable inserted (record and field chosen from the list — no UID to type).\n\n$insertText"
+    } else {
+        "Keeper reference inserted!\n\n$keeperNotation"
     }
 
     private fun showError(project: Project, message: String) {

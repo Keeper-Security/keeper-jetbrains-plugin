@@ -1,6 +1,7 @@
 package keepersecurity.run
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
@@ -12,6 +13,9 @@ import keepersecurity.util.KeeperCommandUtils
 import keepersecurity.util.KeeperJsonUtils
 import keepersecurity.util.KeeperRecordFieldExtractor
 import java.io.File
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Shared pipeline: read `.env` Keeper refs, fetch secrets via shell, run a command with injected env.
@@ -25,6 +29,9 @@ object KeeperSecureScriptRunner {
         isLenient = true
         allowTrailingComma = true
     }
+
+    /** Hard ceiling on a single Run Keeper Securely invocation; the Stop button kicks in earlier. */
+    private const val SCRIPT_HARD_TIMEOUT_SECONDS: Long = 60L * 60L
 
     data class ExecutionResult(
         val replacements: Int,
@@ -40,6 +47,7 @@ object KeeperSecureScriptRunner {
         commandLine: String,
         indicator: ProgressIndicator,
         logger: Logger,
+        onProcessStarted: (Process) -> Unit = {},
     ): ExecutionResult {
         val errors = mutableListOf<String>()
         val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]+)/field/(\S+)""")
@@ -68,6 +76,7 @@ object KeeperSecureScriptRunner {
         }
 
         if (!isKeeperReady(logger)) {
+            if (indicator.isCanceled) throw ProcessCanceledException()
             return ExecutionResult(
                 0,
                 listOf("Keeper is not ready. Run 'Check Keeper Authorization' first."),
@@ -75,12 +84,14 @@ object KeeperSecureScriptRunner {
                 -1,
             )
         }
+        if (indicator.isCanceled) throw ProcessCanceledException()
 
         val envVars = mutableMapOf<String, String>()
         logger.info("Found ${keeperRefs.size} Keeper references to process")
         indicator.text = "Fetching ${keeperRefs.size} secrets via persistent shell..."
 
         keeperRefs.forEachIndexed { index, (key, uid, field) ->
+            if (indicator.isCanceled) throw ProcessCanceledException()
             indicator.text = "Fetching secret ${index + 1}/${keeperRefs.size}: $key"
             try {
                 val secretJson = getKeeperJsonFromShell(uid, logger)
@@ -104,8 +115,18 @@ object KeeperSecureScriptRunner {
             }
         }
 
+        if (indicator.isCanceled) throw ProcessCanceledException()
+
         indicator.text = "Running script with injected secrets..."
-        val (scriptOutput, exitCode) = runScriptWithEnv(envVars, commandLine, errors, workingDirectory, logger)
+        val (scriptOutput, exitCode) = runScriptWithEnv(
+            envVars,
+            commandLine,
+            errors,
+            workingDirectory,
+            indicator,
+            logger,
+            onProcessStarted,
+        )
         return ExecutionResult(envVars.size, errors, scriptOutput, exitCode)
     }
 
@@ -114,7 +135,9 @@ object KeeperSecureScriptRunner {
         commandLine: String,
         errors: MutableList<String>,
         fileParentDir: File,
+        indicator: ProgressIndicator,
         logger: Logger,
+        onProcessStarted: (Process) -> Unit,
     ): Pair<String, Int> {
         return try {
             if (commandLine.isBlank()) {
@@ -143,14 +166,51 @@ object KeeperSecureScriptRunner {
             logger.info("Command: ${commandParts.joinToString(" ")}")
 
             val process = pb.start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            val exitCode = process.waitFor()
+            onProcessStarted(process)
 
+            // Drain stdout on a separate thread so a hung child can't block cancellation behind
+            // a synchronous readText() that's waiting for an EOF that may never arrive.
+            val outputFuture = CompletableFuture.supplyAsync {
+                process.inputStream.bufferedReader().use { it.readText() }
+            }
+
+            val scriptStart = System.currentTimeMillis()
+            while (process.isAlive) {
+                if (indicator.isCanceled) {
+                    process.destroyForcibly()
+                    throw ProcessCanceledException()
+                }
+                if (System.currentTimeMillis() - scriptStart > SCRIPT_HARD_TIMEOUT_SECONDS * 1000L) {
+                    logger.warn("Script exceeded hard timeout (${SCRIPT_HARD_TIMEOUT_SECONDS}s); destroying.")
+                    process.destroyForcibly()
+                    errors.add("Command exceeded ${SCRIPT_HARD_TIMEOUT_SECONDS}s timeout and was killed")
+                    break
+                }
+                process.waitFor(1, TimeUnit.SECONDS)
+            }
+
+            // Stop both cancels the indicator and force-kills the process; if the kill races ahead
+            // of the next isCanceled check the loop exits with the SIGKILL exit code. Re-check here
+            // so user cancellation always surfaces cleanly.
+            if (indicator.isCanceled) {
+                throw ProcessCanceledException()
+            }
+
+            val output = try {
+                outputFuture.get(2, TimeUnit.SECONDS)
+            } catch (_: TimeoutException) {
+                outputFuture.cancel(true)
+                ""
+            }
+
+            val exitCode = process.exitValue()
             logger.info("Script completed with exit code: $exitCode")
             if (exitCode != 0) {
                 errors.add("Command exited with code $exitCode")
             }
             Pair(output, exitCode)
+        } catch (pce: ProcessCanceledException) {
+            throw pce
         } catch (ex: Exception) {
             logger.error("Failed to run script", ex)
             errors.add("Failed to execute script: ${ex.message}")
@@ -178,42 +238,21 @@ object KeeperSecureScriptRunner {
                     logger.error("Failed to start Keeper shell")
                     return false
                 }
-                logger.info("Shell started successfully, waiting for full initialization...")
-                Thread.sleep(5000)
             }
 
+            // Liveness check only. KeeperShellService.executeCommand strips the prompt strings
+            // (My Vault>, Keeper>, Not logged in>) out of its return value, so matching the response
+            // content is unreliable. KeeperShellService.isReady() is authoritative — it's set during
+            // startup once the real prompt is observed on the raw output.
             val timeoutSeconds = if (wasAlreadyReady) 15L else 45L
-            logger.info("Verifying shell readiness (timeout: ${timeoutSeconds}s)...")
-
-            val output = try {
+            logger.info("Probing shell liveness (timeout: ${timeoutSeconds}s)...")
+            try {
                 KeeperShellService.executeCommand("", timeoutSeconds)
             } catch (e: Exception) {
-                logger.warn("Empty command failed, trying 'this-device': ${e.message}")
-                KeeperShellService.executeCommand("this-device", timeoutSeconds)
+                logger.warn("Shell liveness probe failed: ${e.message}")
+                return false
             }
-
-            val isReady = output.contains("My Vault>", ignoreCase = true) ||
-                output.contains("Keeper>", ignoreCase = true) ||
-                output.contains("Not logged in>", ignoreCase = true) ||
-                output.contains("Persistent Login: ON", ignoreCase = true) ||
-                output.contains("Status: SUCCESSFUL", ignoreCase = true) ||
-                output.contains("Device Name:", ignoreCase = true) ||
-                output.contains("Decrypted [", ignoreCase = true) ||
-                output.contains("record(s)", ignoreCase = true) ||
-                (output.isNotBlank() && !output.contains("error", ignoreCase = true) && !output.contains("failed", ignoreCase = true))
-
-            if (!isReady) {
-                try {
-                    val testOutput = KeeperShellService.executeCommand("", 10)
-                    if (testOutput.contains(">") || testOutput.isBlank()) {
-                        return true
-                    }
-                } catch (e: Exception) {
-                    logger.warn("Final test failed: ${e.message}")
-                }
-            }
-
-            isReady
+            KeeperShellService.isReady()
         } catch (ex: Exception) {
             logger.error("Error checking Keeper readiness: ${ex.message}")
             logger.debug("Full exception details", ex)

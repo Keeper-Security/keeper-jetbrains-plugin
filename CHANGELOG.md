@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-07
+
 ### Added
 - **Run Keeper Securely** as a saved run configuration (**Run → Edit Configurations**): `.env` path, working directory, command, output in the Run tool window; defaults for Python SDK / venv and common entry scripts when creating a new configuration
 - **JetBrains HTTP Client** integration for `.http` files: `{{ $keeper("recordUid", "field") }}` dynamic variable (where HTTP Client is bundled); **Get Keeper Secret** inserts the snippet in `.http` / `.rest` files

@@ -43,15 +43,14 @@ class KeeperSecureRunConfigurationEditor(@Suppress("UNUSED_PARAMETER") project: 
 
     override fun applyEditorTo(s: KeeperSecureRunConfiguration) {
         val o = s.options
-        val env = envFileField.text.trim().ifBlank { ".env" }
-        o.envFilePath = env
+        o.envFilePath = envFileField.text.trim()
         o.workingDirectoryPath = workingDirField.text.trim()
         o.command = commandField.text.trim()
     }
 
     override fun resetEditorFrom(s: KeeperSecureRunConfiguration) {
         val o = s.options
-        envFileField.text = (o.envFilePath ?: "").ifBlank { ".env" }
+        envFileField.text = o.envFilePath.orEmpty()
         workingDirField.text = o.workingDirectoryPath.orEmpty()
         commandField.text = o.command.orEmpty()
     }
