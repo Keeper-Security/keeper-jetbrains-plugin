@@ -8,6 +8,9 @@ on:
         default: true
         type: boolean
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
         with:
           name: plugin-build
           path: "build/distributions/*.zip"
-          retention-days: 30
+          retention-days: 10
 
   generate-sbom:
     runs-on: ubuntu-latest
@@ -127,6 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 20
+    if: github.event.inputs.publish == 'true'
     needs:
       - test
       - build-plugin
@@ -196,12 +200,6 @@ jobs:
             -PsignPlugin.certificateChain=$CERTIFICATE_CHAIN \
             -PsignPlugin.privateKey=$PRIVATE_KEY \
             -PsignPlugin.password=$PRIVATE_KEY_PASSWORD
-      - name: Upload plugin artifact for testing
-        if: ${{ github.event.inputs.publish == 'false' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: jetbrains-plugin-${{ github.run_number }}
-          path: ./artifacts/*.zip
       - name: Create Release Summary
         if: github.event.inputs.publish == 'true' && steps.check-version.outputs.should_publish == 'true'
         env:
