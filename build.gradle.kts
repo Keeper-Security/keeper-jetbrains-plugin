@@ -1,3 +1,4 @@
+import java.io.File
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -101,8 +102,8 @@ intellijPlatform {
     }
 
     signing {
-        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN").map { java.io.File(it).readText() }
-        privateKey = providers.environmentVariable("PRIVATE_KEY").map { java.io.File(it).readText() }
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN").map { File(it).readText() }
+        privateKey = providers.environmentVariable("PRIVATE_KEY").map { File(it).readText() }
         password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
     }
 
