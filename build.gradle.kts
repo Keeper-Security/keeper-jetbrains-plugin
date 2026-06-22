@@ -1,3 +1,4 @@
+import java.io.File
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -61,6 +62,9 @@ dependencies {
 
 
 // Configure IntelliJ Platform Gradle Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
+//
+// Run Gradle on JDK 21 — Eclipse Temurin or JetBrains Runtime (IDE → Settings → Build → Gradle → Gradle JVM).
+// Matches kotlin.jvmToolchain(21).
 intellijPlatform {
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
@@ -98,8 +102,11 @@ intellijPlatform {
     }
 
     signing {
-        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
-        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        // CERTIFICATE_CHAIN and PRIVATE_KEY must be file paths (e.g. /path/to/cert.crt), not PEM content.
+        // CI writes the secrets to files and sets these vars to the file paths (see publish.jetbrains.yml).
+        // Local signing: write the PEM files to disk and export the paths, not the content.
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN").map { File(it).readText() }
+        privateKey = providers.environmentVariable("PRIVATE_KEY").map { File(it).readText() }
         password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
     }
 

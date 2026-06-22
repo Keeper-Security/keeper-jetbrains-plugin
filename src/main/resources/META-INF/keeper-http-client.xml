@@ -1,0 +1,6 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <httpClient.dynamicVariablesProvider
+                implementation="keepersecurity.http.KeeperHttpClientDynamicVariablesProvider"/>
+    </extensions>
+</idea-plugin>
