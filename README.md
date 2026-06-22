@@ -48,7 +48,7 @@ The goal is to enable developers to manage secrets securely without leaving thei
   - Authenticate using persistent login or biometric login
 - **Keeper Security Account**: Active subscription with vault access
 - **System Requirements**:
-  - JetBrains IDE: 2021.1 or later (see `pluginSinceBuild` in the plugin for the exact minimum)
+  - JetBrains IDE: **2024.3 or later** (`pluginSinceBuild = 243`)
   - **HTTP Client** features require an IDE distribution that bundles the JetBrains HTTP Client (optional dependency); IntelliJ IDEA Community Edition does not include it by default
 - **Building this plugin from source**: JDK **21** (Eclipse Temurin or JetBrains Runtime recommended for Gradle)
 

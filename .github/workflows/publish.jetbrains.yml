@@ -197,6 +197,13 @@ jobs:
             -PsignPlugin.certificateChain=$CERTIFICATE_CHAIN \
             -PsignPlugin.privateKey=$PRIVATE_KEY \
             -PsignPlugin.password=$PRIVATE_KEY_PASSWORD
+      - name: Upload signed plugin artifact
+        if: steps.check-version.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: jetbrains-plugin-signed-${{ github.run_number }}
+          path: build/distributions/*-signed.zip
+          retention-days: 10
       - name: Create Release Summary
         if: github.event.inputs.publish == 'true' && steps.check-version.outputs.should_publish == 'true'
         env:

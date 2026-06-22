@@ -33,7 +33,7 @@ object KeeperRecordFieldExtractor {
             if (parentObject != null) {
                 val result = parentObject[subFieldName]?.jsonPrimitive?.contentOrNull
                 if (result != null) {
-                    logger.info("Found sub-field '$subFieldName' in parent '$parentFieldName': ${result.take(10)}...")
+                    logger.info("Found sub-field '$subFieldName' in parent '$parentFieldName'")
                     return result
                 } else {
                     logger.warn("Found parent '$parentFieldName' but sub-field '$subFieldName' not found in it")
@@ -50,7 +50,7 @@ object KeeperRecordFieldExtractor {
             val result = findFieldValueAnywhere(jsonObject, fieldName, logger)
 
             if (result != null) {
-                logger.info("Found field '$fieldName': ${result.take(10)}...")
+                logger.info("Found field '$fieldName'")
             } else {
                 logger.warn("Field '$fieldName' not found anywhere in JSON")
             }

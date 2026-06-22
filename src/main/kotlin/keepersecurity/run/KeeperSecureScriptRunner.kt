@@ -20,6 +20,11 @@ import java.util.concurrent.TimeoutException
 /**
  * Shared pipeline: read `.env` Keeper refs, fetch secrets via shell, run a command with injected env.
  * Used by [keepersecurity.action.KeeperSecretAction] and [KeeperSecureRunConfiguration].
+ *
+ * Concurrency: all Keeper shell commands route through [keepersecurity.service.KeeperShellService],
+ * which serializes them behind a single ReentrantLock. Running two configurations simultaneously is
+ * safe (no shell corruption), but the second run's secret-fetch phase will block until the first
+ * releases the lock — it will appear to hang with "Fetching secrets…" until contention clears.
  */
 @OptIn(ExperimentalSerializationApi::class)
 object KeeperSecureScriptRunner {
@@ -72,21 +77,23 @@ object KeeperSecureScriptRunner {
         }
 
         if (keeperRefs.isEmpty()) {
-            return ExecutionResult(0, listOf("No Keeper references found in .env file"), "", -1)
+            logger.warn("No Keeper references found in .env file; running command with no secret injection")
         }
-
-        if (!isKeeperReady(logger)) {
-            if (indicator.isCanceled) throw ProcessCanceledException()
-            return ExecutionResult(
-                0,
-                listOf("Keeper is not ready. Run 'Check Keeper Authorization' first."),
-                "",
-                -1,
-            )
-        }
-        if (indicator.isCanceled) throw ProcessCanceledException()
 
         val envVars = mutableMapOf<String, String>()
+
+        if (keeperRefs.isNotEmpty()) {
+            if (!isKeeperReady(logger)) {
+                if (indicator.isCanceled) throw ProcessCanceledException()
+                return ExecutionResult(
+                    0,
+                    listOf("Keeper is not ready. Run 'Check Keeper Authorization' first."),
+                    "",
+                    -1,
+                )
+            }
+            if (indicator.isCanceled) throw ProcessCanceledException()
+        }
         logger.info("Found ${keeperRefs.size} Keeper references to process")
         indicator.text = "Fetching ${keeperRefs.size} secrets via persistent shell..."
 
@@ -180,11 +187,18 @@ object KeeperSecureScriptRunner {
                     process.destroyForcibly()
                     throw ProcessCanceledException()
                 }
-                if (System.currentTimeMillis() - scriptStart > SCRIPT_HARD_TIMEOUT_SECONDS * 1000L) {
+                val elapsedSeconds = (System.currentTimeMillis() - scriptStart) / 1000L
+                if (elapsedSeconds > SCRIPT_HARD_TIMEOUT_SECONDS) {
                     logger.warn("Script exceeded hard timeout (${SCRIPT_HARD_TIMEOUT_SECONDS}s); destroying.")
                     process.destroyForcibly()
                     errors.add("Command exceeded ${SCRIPT_HARD_TIMEOUT_SECONDS}s timeout and was killed")
                     break
+                }
+                val remaining = SCRIPT_HARD_TIMEOUT_SECONDS - elapsedSeconds
+                indicator.text = if (remaining > 120) {
+                    "Running command… (${elapsedSeconds}s elapsed)"
+                } else {
+                    "Running command… ($remaining s until hard timeout)"
                 }
                 process.waitFor(1, TimeUnit.SECONDS)
             }

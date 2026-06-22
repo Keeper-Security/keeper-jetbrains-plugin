@@ -24,11 +24,16 @@ object KeeperHttpSecretResolver {
      * the throw as a variable-resolution error and skips the request, rather than substituting the
      * error message into the URL, headers, or body.
      */
+    private val UID_PATTERN = Regex("""^[A-Za-z0-9_-]+$""")
+
     fun resolveRecordField(recordUid: String, fieldPath: String, logger: Logger): String {
         val trimmedUid = recordUid.trim()
         val trimmedField = fieldPath.trim()
         if (trimmedUid.isEmpty() || trimmedField.isEmpty()) {
             throw IllegalArgumentException("Keeper record UID and field path must be non-empty")
+        }
+        if (!UID_PATTERN.matches(trimmedUid)) {
+            throw IllegalArgumentException("Invalid Keeper record UID format: '$trimmedUid'")
         }
 
         return try {

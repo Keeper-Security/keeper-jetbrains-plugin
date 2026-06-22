@@ -120,15 +120,6 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                             val recordJson = try {
                                 val jsonString = KeeperJsonUtils.extractJsonObject(recordJsonText, logger)
 
-                                // ADD THESE LINES TO SEE WHAT WAS EXTRACTED
-                                logger.info("=".repeat(50))
-                                logger.info("RAW OUTPUT LENGTH: ${recordJsonText.length}")
-                                logger.info("EXTRACTED JSON LENGTH: ${jsonString.length}")
-                                logger.info("EXTRACTED JSON: $jsonString")
-                                logger.info("=".repeat(50))
-                                
-
-
                                 json.decodeFromString<KeeperRecord>(jsonString)
                             } catch (ex: Exception) {
                                 logger.error("Failed to parse record JSON", ex)

@@ -102,6 +102,9 @@ intellijPlatform {
     }
 
     signing {
+        // CERTIFICATE_CHAIN and PRIVATE_KEY must be file paths (e.g. /path/to/cert.crt), not PEM content.
+        // CI writes the secrets to files and sets these vars to the file paths (see publish.jetbrains.yml).
+        // Local signing: write the PEM files to disk and export the paths, not the content.
         certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN").map { File(it).readText() }
         privateKey = providers.environmentVariable("PRIVATE_KEY").map { File(it).readText() }
         password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
