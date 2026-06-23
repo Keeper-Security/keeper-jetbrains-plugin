@@ -26,8 +26,23 @@ object KeeperCommandUtils {
         val requiredContent: String? = null,
         val forbiddenContent: String? = null,
         val minLength: Int = 0,
-        val customValidator: ((String) -> Boolean)? = null
+        val customValidator: ((String) -> Boolean)? = null,
+        /**
+         * Optional predicate that, when it matches, short-circuits the retry
+         * loop with a [FatalCommandException] carrying the actual CLI
+         * output. Use this for failures that won't change between attempts
+         * (e.g. Commander Python exceptions, "unknown command", "not logged
+         * in") so the user sees the real error message instead of
+         * "validation failed after N attempts".
+         */
+        val fatalErrorDetector: ((String) -> Boolean)? = null
     )
+
+    /**
+     * Thrown when a command's output matches [ValidationConfig.fatalErrorDetector].
+     * Carries the CLI output so the calling action can surface it verbatim.
+     */
+    class FatalCommandException(val output: String, message: String) : RuntimeException(message)
     
     /**
      * Log level for retry operations
@@ -46,10 +61,11 @@ object KeeperCommandUtils {
         
         for (attempt in 1..config.maxRetries) {
             try {
+                val commandVerb = command.substringBefore(' ')
                 when (config.logLevel) {
-                    LogLevel.DEBUG -> logger?.debug("Attempt $attempt/${config.maxRetries}: $command")
-                    LogLevel.INFO -> logger?.info("Attempt $attempt/${config.maxRetries}: $command")
-                    LogLevel.WARN -> logger?.warn("Attempt $attempt/${config.maxRetries}: $command")
+                    LogLevel.DEBUG -> logger?.debug("Attempt $attempt/${config.maxRetries}: $commandVerb")
+                    LogLevel.INFO -> logger?.info("Attempt $attempt/${config.maxRetries}: $commandVerb")
+                    LogLevel.WARN -> logger?.warn("Attempt $attempt/${config.maxRetries}: $commandVerb")
                 }
                 
                 val output = KeeperShellService.executeCommand(command, config.timeoutSeconds)
@@ -74,6 +90,22 @@ object KeeperCommandUtils {
                 
                 // Apply custom validation if configured
                 if (config.validation != null) {
+                    // Short-circuit on fatal Commander errors — retrying a
+                    // missing-module / "unknown command" call just wastes the
+                    // user's time and buries the real CLI message under our
+                    // "validation failed after N attempts" wrapper.
+                    config.validation.fatalErrorDetector?.let { isFatal ->
+                        if (isFatal(output)) {
+                            val excerpt = output.lineSequence()
+                                .map { it.trim() }
+                                .firstOrNull { it.isNotBlank() }
+                                ?.take(300)
+                                ?: output.take(300)
+                            logger?.warn("Fatal Commander error detected, aborting retries: $excerpt")
+                            throw FatalCommandException(output, excerpt)
+                        }
+                    }
+
                     if (!isValidOutput(output, config.validation, logger)) {
                         if (attempt < config.maxRetries) {
                             logger?.info("Validation failed, retrying in ${config.retryDelayMs}ms...")
@@ -93,6 +125,9 @@ object KeeperCommandUtils {
                 
                 return output
                 
+            } catch (fatal: FatalCommandException) {
+                // Hard Commander failures bypass the retry loop entirely.
+                throw fatal
             } catch (ex: Exception) {
                 lastException = ex
                 logger?.warn("Attempt $attempt failed: ${ex.message}")
@@ -109,6 +144,32 @@ object KeeperCommandUtils {
         throw lastException ?: RuntimeException("Command failed after ${config.maxRetries} attempts")
     }
     
+    /**
+     * Best-effort `sync-down` against the persistent Commander shell.
+     *
+     * The plugin keeps its own long-lived Commander process (see
+     * `KeeperShellService`), which holds a per-session vault cache. Records
+     * or folders that were created in a separate terminal session — even
+     * after the user runs `sync-down` there — won't be visible to the
+     * plugin's shell until *it* also syncs. Listing actions that drive
+     * picker dialogs should call this before fetching so the picker
+     * reflects the live vault.
+     *
+     * Failures are swallowed and logged: a failed sync should never block
+     * the user from at least attempting the listing call that follows
+     * (the stale cache is still better than nothing).
+     */
+    fun syncDownBestEffort(logger: Logger? = null, timeoutSeconds: Long = 30) {
+        try {
+            val startedAt = System.currentTimeMillis()
+            KeeperShellService.executeCommand("sync-down", timeoutSeconds)
+            val elapsed = System.currentTimeMillis() - startedAt
+            logger?.info("sync-down completed in ${elapsed}ms")
+        } catch (ex: Exception) {
+            logger?.warn("sync-down failed (continuing with stale cache): ${ex.message}")
+        }
+    }
+
     /**
      * Validate command output based on configuration
      */

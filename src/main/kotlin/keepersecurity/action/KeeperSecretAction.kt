@@ -21,6 +21,7 @@ import javax.swing.JScrollPane
 import javax.swing.JTextArea
 
 import keepersecurity.run.KeeperSecureScriptRunner
+import keepersecurity.util.KeeperEnvSafety
 
 class KeeperSecretAction : AnAction("Run Keeper Securely") {
     private val logger = thisLogger()
@@ -49,6 +50,15 @@ class KeeperSecretAction : AnAction("Run Keeper Securely") {
         if (commandInput.isNullOrEmpty()) {
             Messages.showWarningDialog(project, "No command provided, aborting.", "Cancelled")
             return
+        }
+
+        if (KeeperEnvSafety.shouldShowFirstRunWarning()) {
+            Messages.showWarningDialog(
+                project,
+                KeeperEnvSafety.FIRST_RUN_WARNING_MESSAGE,
+                "Run Keeper Securely",
+            )
+            KeeperEnvSafety.markFirstRunWarningShown()
         }
 
         ApplicationManager.getApplication().runWriteAction {

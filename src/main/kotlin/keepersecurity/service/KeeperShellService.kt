@@ -1,6 +1,7 @@
 package keepersecurity.service
 
 import com.intellij.openapi.diagnostic.Logger
+import keepersecurity.util.KeeperCliSafety
 import java.io.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -23,6 +24,15 @@ object KeeperShellService {
     // State management
     private val shellReady = AtomicBoolean(false)
     private val starting = AtomicBoolean(false)
+    /**
+     * Flips to true when [waitForShellInitialization] sees Commander's
+     * interactive password prompt — i.e. the persistent-login token is
+     * missing or expired and Commander is asking for a master password we
+     * can't supply over a piped stdin. Read by callers via [isAuthRequired]
+     * so they can surface a precise "not logged in" message instead of a
+     * generic "shell failed to start".
+     */
+    private val authRequired = AtomicBoolean(false)
     private val commandLock = ReentrantLock()
     
     // Track if this is the first time starting (for better UX messaging)
@@ -687,10 +697,47 @@ object KeeperShellService {
             .joinToString("\n").trim()
     }
     
+    /**
+     * Markers that mean Commander has fallen back to interactive auth
+     * because the persistent-login token is missing/expired. Since our
+     * stdin is a pipe, we cannot satisfy the password prompt — the
+     * Commander process would hang until the (huge) startup timeout. Bail
+     * fast instead and let the caller surface a proper "not logged in"
+     * message.
+     *
+     * IMPORTANT: keep these tight. Commander prints
+     * `Logging in to Keeper as <email>` during a *successful* persistent
+     * login too, so we cannot key off that line. The ones below appear
+     * only when Commander is actually blocked on stdin:
+     *  - "Enter master password" — the literal prompt header
+     *  - "GetPassWarning" / "getpass.py" — Python's getpass module warning
+     *    that fires on every interactive password call against a pipe
+     *  - "Password input may be echoed" — same getpass warning, alt phrasing
+     */
+    private val authRequiredMarkers = listOf(
+        "Enter master password",
+        "GetPassWarning",
+        "getpass.py",
+        "Password input may be echoed"
+    )
+
+    /**
+     * Public read accessor for [authRequired]. Set by
+     * [waitForShellInitialization] when Commander is sitting at a
+     * password prompt. Use this to distinguish "shell crashed / CLI
+     * missing" from "user just needs to `keeper login --persistent` once".
+     */
+    fun isAuthRequired(): Boolean = authRequired.get()
+
     private fun waitForShellInitialization(): Boolean {
         val startTime = System.currentTimeMillis()
         val timeoutMs = getShellInitTimeout()
-        
+
+        // Reset before every initialization attempt — the previous attempt
+        // may have flipped this on, but the caller is now retrying with
+        // (hopefully) a refreshed persistent-login config.
+        authRequired.set(false)
+
         logger.info("Waiting for Keeper shell to be ready (${getTimeoutDescription()})...")
         logger.info("Process created successfully, PID: ${process?.pid()}")
         
@@ -699,7 +746,20 @@ object KeeperShellService {
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             bufferLock.withLock {
                 val currentOutput = outputBuffer.toString()
-                
+
+                // Short-circuit on Commander's interactive password prompt.
+                // There's no point waiting the full timeout — without a TTY,
+                // we can't possibly satisfy the prompt.
+                if (authRequiredMarkers.any { currentOutput.contains(it, ignoreCase = true) }) {
+                    logger.warn(
+                        "Commander is asking for a master password (persistent login " +
+                            "missing or expired). Bailing out fast; the user must run " +
+                            "`keeper login --persistent` once in a terminal."
+                    )
+                    authRequired.set(true)
+                    return false
+                }
+
                 if (isShellReady(currentOutput)) {
                     logger.info("Shell appears ready based on output content")
                     
@@ -779,12 +839,13 @@ object KeeperShellService {
             currentCommand.set(execution)
             
             try {
-                logger.info("Executing command: $command")
-                
+                logger.info("Executing command verb: ${command.substringBefore(' ')} (length=${command.length})")
+
                 bufferLock.withLock {
                     outputBuffer.setLength(0)
                 }
-                
+
+                KeeperCliSafety.assertSingleLine(command)
                 writer?.apply {
                     write(command)
                     write("\n")

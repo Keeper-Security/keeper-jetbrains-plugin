@@ -22,19 +22,19 @@ class KeeperActionsBasicTest {
         System.clearProperty("java.awt.headless")
     }
 
+    private fun allActions() = listOf(
+        KeeperRecordAddAction(),
+        KeeperGenerateSecretsAction(),
+        KeeperFolderSelectAction(),
+        KeeperGetSecretAction(),
+        KeeperRecordUpdateAction(),
+        KeeperSecretAction(),
+        KeeperAuthAction()
+    )
+
     @Test
     fun `test all actions can be instantiated`() {
-        val actions = listOf(
-            KeeperRecordAddAction(),
-            KeeperGenerateSecretsAction(),
-            KeeperFolderSelectAction(),
-            KeeperGetSecretAction(),
-            KeeperRecordUpdateAction(),
-            KeeperSecretAction(),
-            KeeperAuthAction()
-        )
-        
-        actions.forEach { action ->
+        allActions().forEach { action ->
             assertNotNull("Action should not be null", action)
             assertNotNull("Action text should not be null", action.templatePresentation.text)
             assertTrue("Action text should not be empty", action.templatePresentation.text.isNotEmpty())
@@ -52,7 +52,7 @@ class KeeperActionsBasicTest {
             KeeperSecretAction() to "Run Keeper Securely",
             KeeperAuthAction() to "Check Keeper Authorization"
         )
-        
+
         expectedNames.forEach { (action, expectedText) ->
             assertEquals("Action text should match", expectedText, action.templatePresentation.text)
         }
@@ -60,18 +60,11 @@ class KeeperActionsBasicTest {
 
     @Test
     fun `test actions extend AnAction`() {
-        val actions = listOf(
-            KeeperRecordAddAction(),
-            KeeperGenerateSecretsAction(),
-            KeeperFolderSelectAction(),
-            KeeperGetSecretAction(),
-            KeeperRecordUpdateAction(),
-            KeeperSecretAction(),
-            KeeperAuthAction()
-        )
-        
-        actions.forEach { action ->
-            assertTrue("Action should extend AnAction", action is com.intellij.openapi.actionSystem.AnAction)
+        allActions().forEach { action ->
+            assertTrue(
+                "Action should extend AnAction",
+                action is com.intellij.openapi.actionSystem.AnAction
+            )
         }
     }
 }

@@ -59,14 +59,14 @@
         <action id="keepersecurity.action.KeeperFolderSelectAction"
                 class="keepersecurity.action.KeeperFolderSelectAction"
                 text="Get Keeper Folder"
-                description="Get folder UUID from Keeper Vault">
+                description="Select any vault folder (Classic or Nested Shared Folder) and save it for record creation">
                 <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
         </action>
 
         <action id="keepersecurity.action.KeeperGetSecretAction"
                 class="keepersecurity.action.KeeperGetSecretAction"
                 text="Get Keeper Secret"
-                description="Choose a Keeper record and field; inserts keeper:// in .env/scripts or {{$keeper(...)}} in .http files">
+                description="Choose any Keeper record (Classic or Nested Shared Folder) and field; inserts keeper:// in .env/scripts or {{$keeper(...)}} in .http files">
                 <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
         </action>
 
@@ -105,12 +105,12 @@
             <action id="keepersecurity.action.KeeperFolderSelectActionEditor"
                     class="keepersecurity.action.KeeperFolderSelectAction"
                     text="Get Keeper Folder"
-                    description="Select a Keeper folder and save its UUID"/>
+                    description="Select any vault folder (Classic or Nested Shared Folder) and save it"/>
 
             <action id="keepersecurity.action.KeeperGetSecretActionEditor"
                 class="keepersecurity.action.KeeperGetSecretAction"
                 text="Get Keeper Secret"
-                description="Choose a Keeper record and field; inserts keeper:// or HTTP Client {{$keeper(...)}}"/>
+                description="Choose any Keeper record (Classic or Nested Shared Folder) and field; inserts keeper:// or HTTP Client {{$keeper(...)}}"/>
 
             <!-- Generate Keeper Secrets action (Editor popup) -->
             <action id="keepersecurity.action.KeeperGenerateSecretsActionEditor"
