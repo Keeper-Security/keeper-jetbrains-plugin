@@ -16,8 +16,7 @@ import keepersecurity.util.KeeperCliSafety
 import keepersecurity.util.KeeperCommandUtils
 import keepersecurity.util.KeeperJsonUtils
 import keepersecurity.util.KeeperRecordOutputValidators
-import kotlinx.serialization.json.Json  
-import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import keepersecurity.model.GeneratedPassword
 import kotlinx.serialization.ExperimentalSerializationApi
 

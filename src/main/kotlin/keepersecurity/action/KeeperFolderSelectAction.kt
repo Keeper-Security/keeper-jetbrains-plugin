@@ -12,7 +12,6 @@ import keepersecurity.ui.KeeperListPickerDialog
 import keepersecurity.ui.KeeperListPickerItem
 import keepersecurity.ui.KeeperVaultBadge
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 import keepersecurity.model.KeeperFolder
 import keepersecurity.util.KeeperJsonUtils
 import keepersecurity.util.KeeperCommandUtils
@@ -115,7 +114,7 @@ class KeeperFolderSelectAction : AnAction("Get Keeper Folder") {
                         Messages.showInfoMessage(
                             project,
                             "$locationLabel folder '${selectedFolder.name}' " +
-                                "(UUID '${selectedFolder.uid}') has been saved for this project.",
+                                "(Uuid '${selectedFolder.uid}') has been saved for this project.",
                             "Keeper Folder Saved"
                         )
                     }

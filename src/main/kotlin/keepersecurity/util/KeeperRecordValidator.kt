@@ -6,7 +6,6 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import keepersecurity.model.KeeperRecord
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -42,7 +41,7 @@ object KeeperRecordValidator {
         ) : Verdict()
 
         /** UID not present in the current vault listing. */
-        object NotFound : Verdict()
+        data object NotFound : Verdict()
 
         /**
          * The CLI lookup itself failed (shell unhealthy, network down,

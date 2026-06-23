@@ -76,7 +76,7 @@ object KeeperSecureScriptRunner {
                     val field = match.groupValues[2]
                     if (!KeeperCliSafety.isValidRecordUid(uid)) {
                         errors.add(
-                            "Skipped $key: invalid Keeper record UID '$uid' in keeper:// notation " +
+                            "Skipped $key: invalid Keeper record uid '$uid' in keeper:// notation " +
                                 "(expected exactly 22 characters: A-Z, a-z, 0-9, _, -)"
                         )
                         logger.warn("Invalid keeper:// UID for key '$key': '$uid'")
@@ -262,9 +262,9 @@ object KeeperSecureScriptRunner {
 
     private fun getKeeperJsonFromShell(uid: String, logger: Logger): String {
         if (!KeeperCliSafety.isValidRecordUid(uid)) {
-            throw IllegalArgumentException("Invalid Keeper record UID: $uid")
+            throw IllegalArgumentException("Invalid Keeper record uid: $uid")
         }
-        KeeperCliSafety.requireSafe(uid, "record UID")
+        KeeperCliSafety.requireSafe(uid, "record uid")
         val output = KeeperCommandUtils.executeCommandWithRetry(
             "get $uid --format json",
             KeeperCommandUtils.Presets.jsonObject(maxRetries = 3),

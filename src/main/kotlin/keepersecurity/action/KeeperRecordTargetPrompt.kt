@@ -46,7 +46,7 @@ object KeeperRecordTargetPrompt {
     /**
      * Outcome of [promptForAddTarget] / [promptForGenerateTarget].
      *
-     * Both [Classic] and [Drive] carry the resolved folder UUID + display
+     * Both [AddOutcome.Classic] and [AddOutcome.Drive] carry the resolved folder UUID + display
      * name so the caller doesn't have to re-read `PropertiesComponent`
      * (and pick the wrong scope — see the project-scope vs app-scope
      * footgun fixed earlier).
@@ -57,7 +57,7 @@ object KeeperRecordTargetPrompt {
      * compatibility with callers that build outcomes from tests.
      */
     sealed class AddOutcome {
-        object Cancelled : AddOutcome()
+        data object Cancelled : AddOutcome()
         data class Classic(val folderUuid: String?, val folderName: String?) : AddOutcome()
         data class Drive(val folderUuid: String?, val folderName: String?) : AddOutcome()
     }
@@ -114,7 +114,7 @@ object KeeperRecordTargetPrompt {
     /** What happened when we examined a slot. */
     private sealed class SlotResult {
         /** Slot was empty — nothing to do. */
-        object Empty : SlotResult()
+        data object Empty : SlotResult()
 
         /** Slot resolved to a valid folder; downstream should use it. */
         data class Resolved(val outcome: AddOutcome) : SlotResult()

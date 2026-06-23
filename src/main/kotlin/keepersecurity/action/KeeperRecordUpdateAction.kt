@@ -70,20 +70,20 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
 
         val rawRecordUid = Messages.showInputDialog(
             project,
-            "Enter Keeper record UID:",
-            "Record UID",
+            "Enter Keeper record uid:",
+            "Record Uid",
             null
         )?.trim()
 
         if (rawRecordUid.isNullOrBlank()) {
-            showError("Record UID is required", project)
+            showError("Record uid is required", project)
             return
         }
 
         val recordUid = try {
-            KeeperCliSafety.requireSafe(rawRecordUid, "record UID")
+            KeeperCliSafety.requireSafe(rawRecordUid, "record uid")
         } catch (ex: KeeperCliSafety.UnsafeCliInputException) {
-            showError(ex.message ?: "Record UID is not safe.", project)
+            showError(ex.message ?: "Record uid is not safe.", project)
             return
         }
 
@@ -103,16 +103,16 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
             }
             is KeeperRecordValidator.Verdict.NotFound -> {
                 showError(
-                    "Record UID '$recordUid' was not found in your vault. " +
+                    "Record uid '$recordUid' was not found in your vault. " +
                         "Double-check the value (Tools \u2192 Keeper Vault \u2192 Get Keeper Secret " +
-                        "lists every record with its UID).",
+                        "lists every record with its uid).",
                     project
                 )
                 return
             }
             is KeeperRecordValidator.Verdict.Unknown -> {
                 showError(
-                    "Couldn't verify the record UID against your vault " +
+                    "Couldn't verify the record uid against your vault " +
                         "(${verdict.reason}). Make sure Keeper Commander is healthy and try again.",
                     project
                 )

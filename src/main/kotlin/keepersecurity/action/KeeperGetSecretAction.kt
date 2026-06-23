@@ -16,7 +16,6 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.vfs.VirtualFile
 import keepersecurity.service.KeeperShellService
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 import keepersecurity.model.KeeperRecord
 import keepersecurity.model.getDisplayValue
 import keepersecurity.util.KeeperJsonUtils
@@ -365,7 +364,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
         insertText: String,
         keeperNotation: String,
     ): String = if (isHttpSnippet) {
-        "HTTP Client variable inserted (record and field chosen from the list — no UID to type).\n\n$insertText"
+        "HTTP Client variable inserted (record and field chosen from the list — no uid to type).\n\n$insertText"
     } else {
         "Keeper reference inserted!\n\n$keeperNotation"
     }

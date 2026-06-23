@@ -14,11 +14,11 @@ import java.util.concurrent.TimeUnit
 /**
  * Three-state outcome of the Keeper shell probe used by [KeeperAuthAction].
  *
- *  - [AUTHENTICATED] — shell is up *and* the user is logged in. Safe to
+ *  - `AUTHENTICATED` — shell is up *and* the user is logged in. Safe to
  *    proceed with any other Keeper action.
- *  - [NOT_LOGGED_IN] — shell process exists, but Commander reports the
+ *  - `NOT_LOGGED_IN` — shell process exists, but Commander reports the
  *    "Not logged in>" prompt. The user must run `keeper login` once.
- *  - [FAILED] — shell did not respond, returned blank output, or otherwise
+ *  - `FAILED` — shell did not respond, returned blank output, or otherwise
  *    failed to demonstrate a working authenticated session. We refuse to
  *    declare success on weak evidence (older code's catch-all rule led to
  *    false-positive "Authorization OK" dialogs against a half-dead shell).

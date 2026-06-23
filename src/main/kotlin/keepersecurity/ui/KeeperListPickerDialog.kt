@@ -3,7 +3,6 @@ package keepersecurity.ui
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.CollectionListModel
-import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
@@ -24,6 +23,7 @@ import javax.swing.ListCellRenderer
 import javax.swing.ListSelectionModel
 import javax.swing.SwingConstants
 import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 /** Vault-model badge shown beside each folder or record in the searchable picker. */
 enum class KeeperVaultBadge(val label: String) {
@@ -43,7 +43,7 @@ data class KeeperListPickerItem(
     fun matchesSearch(query: String): Boolean {
         if (query.isEmpty()) return true
         if (label.contains(query, ignoreCase = true)) return true
-        return badge?.label?.contains(query, ignoreCase = true) == true
+        return badge?.label?.contains(query, ignoreCase = true) ?: false
     }
 }
 
@@ -112,7 +112,7 @@ object KeeperListPickerDialog {
 
     private class ListPickerDialog(
         project: Project,
-        dialogTitle: String,
+        private val dialogTitle: String,
         private val message: String,
         private val options: List<KeeperListPickerItem>,
         private val initial: KeeperListPickerItem?,
@@ -145,8 +145,12 @@ object KeeperListPickerDialog {
                 }
             })
 
-            search.textEditor.document.addDocumentListener(object : DocumentAdapter() {
-                override fun textChanged(e: DocumentEvent) {
+            search.textEditor.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = onTextChanged()
+                override fun removeUpdate(e: DocumentEvent) = onTextChanged()
+                override fun changedUpdate(e: DocumentEvent) = onTextChanged()
+
+                private fun onTextChanged() {
                     val query = search.text.trim()
                     val filtered = options.filter { it.matchesSearch(query) }
                     listModel.replaceAll(filtered)
@@ -205,12 +209,11 @@ object KeeperListPickerDialog {
         ): Component {
             nameLabel.text = value?.label.orEmpty()
 
-            val badge = value?.badge
-            if (badge != null) {
+            value?.badge?.let { badge ->
                 badgeLabel.isVisible = true
                 badgeLabel.text = badge.label
                 applyBadgeColors(badgeLabel, badge, isSelected, list)
-            } else {
+            } ?: run {
                 badgeLabel.isVisible = false
             }
 

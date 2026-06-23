@@ -60,22 +60,9 @@ data class KeeperFolder(
             SOURCE_KEEPER_DRIVE,
         )
 
-        /**
-         * Wire values that mean Classic vault folder. Current Commander:
-         * [SOURCE_CLASSIC_FOLDER]. Legacy: [SOURCE_LEGACY]. Null/missing → classic.
-         */
-        private val CLASSIC_SOURCES = setOf(
-            SOURCE_CLASSIC_FOLDER,
-            SOURCE_LEGACY,
-        )
-
         /** True when [source] identifies a Nested Shared Folder row. */
-        fun isNestedShareSource(source: String?): Boolean =
+        private fun isNestedShareSource(source: String?): Boolean =
             source != null && NESTED_SHARE_SOURCES.any { it.equals(source, ignoreCase = true) }
-
-        /** True when [source] identifies a Classic vault folder row. */
-        fun isClassicSource(source: String?): Boolean =
-            source == null || CLASSIC_SOURCES.any { it.equals(source, ignoreCase = true) }
     }
 
     /** True when this folder is a Nested Shared Folder (not Classic Vault). */
@@ -122,14 +109,9 @@ data class KeeperRecord(
         )
 
         /** True when [recordCategory] identifies a Nested Shared record row. */
-        fun isNestedShareCategory(recordCategory: String?): Boolean =
+        private fun isNestedShareCategory(recordCategory: String?): Boolean =
             recordCategory != null &&
                 NESTED_SHARE_CATEGORIES.any { it.equals(recordCategory, ignoreCase = true) }
-
-        /** True when [recordCategory] identifies a Classic vault record row. */
-        fun isClassicCategory(recordCategory: String?): Boolean =
-            recordCategory == null ||
-                recordCategory.equals(CATEGORY_CLASSIC, ignoreCase = true)
     }
 
     /** True when this record lives in a Nested Shared Folder (not Classic Vault). */

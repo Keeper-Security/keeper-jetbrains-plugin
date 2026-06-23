@@ -6,7 +6,6 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import keepersecurity.model.KeeperFolder
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -45,7 +44,7 @@ object KeeperFolderValidator {
         ) : Verdict()
 
         /** UUID is not present in the current `ls` payload. */
-        object Missing : Verdict()
+        data object Missing : Verdict()
 
         /**
          * UUID exists but lives in the *other* vault — e.g. the project
