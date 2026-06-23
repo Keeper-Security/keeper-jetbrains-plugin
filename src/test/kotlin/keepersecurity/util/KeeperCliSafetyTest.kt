@@ -64,4 +64,13 @@ class KeeperCliSafetyTest {
         assertTrue(KeeperCliSafety.KEEPER_RECORD_UID.matches("2zHC3Umb41PnVECFZxYTXw"))
         assertFalse(KeeperCliSafety.KEEPER_RECORD_UID.matches("prefix2zHC3Umb41PnVECFZxYTXw"))
     }
+
+    @Test fun `escapeDoubleQuoted escapes backslashes and double quotes`() {
+        assertEquals("foo\\\"bar", KeeperCliSafety.escapeDoubleQuoted("foo\"bar"))
+        assertEquals("back\\\\slash", KeeperCliSafety.escapeDoubleQuoted("back\\slash"))
+    }
+
+    @Test fun `escapeSingleQuoted escapes embedded single quotes`() {
+        assertEquals("it'\\''s", KeeperCliSafety.escapeSingleQuoted("it's"))
+    }
 }

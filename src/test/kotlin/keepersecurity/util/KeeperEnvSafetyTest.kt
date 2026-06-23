@@ -33,10 +33,10 @@ class KeeperEnvSafetyTest {
         assertNull(KeeperEnvSafety.blockedEnvKeyReason("APP_NAME"))
     }
 
-    @Test fun `blockedEnvValueReason rejects interpreter flag values`() {
-        assertTrue(
-            KeeperEnvSafety.blockedEnvValueReason("--require=./pwn.js")!!.contains("interpreter flag")
-        )
+    @Test fun `blockedEnvValueReason allows flag-like secret values`() {
+        assertNull(KeeperEnvSafety.blockedEnvValueReason("--require=./pwn.js"))
+        assertNull(KeeperEnvSafety.blockedEnvValueReason("-Dtimezone=UTC"))
+        assertNull(KeeperEnvSafety.blockedEnvValueReason("-Xmx4g"))
     }
 
     @Test fun `blockedEnvValueReason rejects command substitution`() {
@@ -68,5 +68,23 @@ class KeeperEnvSafetyTest {
             "postgres://localhost/db",
             (verdict as KeeperEnvSafety.Verdict.Allowed).value,
         )
+    }
+
+    @Test fun `buildSubprocessEnvironment drops inherited hook vars and keeps PATH`() {
+        val inherited = mapOf(
+            "PATH" to "/usr/bin",
+            "HOME" to "/Users/test",
+            "NODE_OPTIONS" to "--require=./evil.js",
+            "LD_PRELOAD" to "/tmp/pwn.so",
+        )
+        val injected = mapOf("DATABASE_URL" to "postgres://localhost/db")
+
+        val env = KeeperEnvSafety.buildSubprocessEnvironment(inherited, injected, isWindows = false)
+
+        assertEquals("postgres://localhost/db", env["DATABASE_URL"])
+        assertEquals("/usr/bin", env["PATH"])
+        assertEquals("/Users/test", env["HOME"])
+        assertNull(env["NODE_OPTIONS"])
+        assertNull(env["LD_PRELOAD"])
     }
 }

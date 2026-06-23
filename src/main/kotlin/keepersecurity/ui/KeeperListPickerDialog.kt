@@ -34,11 +34,13 @@ enum class KeeperVaultBadge(val label: String) {
 /**
  * One row in [KeeperListPickerDialog]. [label] is the folder or record name;
  * [badge] identifies Classic vs Nested Shared Folder when both vault models
- * appear in the same list.
+ * appear in the same list. [id] carries the folder or record uid so duplicate
+ * display names resolve to the row the user actually clicked.
  */
 data class KeeperListPickerItem(
     val label: String,
     val badge: KeeperVaultBadge? = null,
+    val id: String? = null,
 ) {
     fun matchesSearch(query: String): Boolean {
         if (query.isEmpty()) return true

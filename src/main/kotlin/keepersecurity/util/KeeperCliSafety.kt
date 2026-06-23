@@ -24,6 +24,14 @@ object KeeperCliSafety {
     /** True when [uid] matches [KEEPER_RECORD_UID]. */
     fun isValidRecordUid(uid: String): Boolean = KEEPER_RECORD_UID.matches(uid)
 
+    /** Escape `\` and `"` before embedding a value in a double-quoted CLI argument. */
+    fun escapeDoubleQuoted(value: String): String =
+        value.replace("\\", "\\\\").replace("\"", "\\\"")
+
+    /** Escape `'` for embedding in a single-quoted CLI argument (POSIX shell rules). */
+    fun escapeSingleQuoted(value: String): String =
+        value.replace("'", "'\\''")
+
     /**
      * Thrown when a user-supplied string or an assembled command
      * contains a forbidden control character. The message is suitable

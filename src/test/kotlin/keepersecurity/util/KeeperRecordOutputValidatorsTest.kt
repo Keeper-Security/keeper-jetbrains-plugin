@@ -121,6 +121,12 @@ class KeeperRecordOutputValidatorsTest {
         assertFalse(KeeperRecordOutputValidators.isRecordUpdateSuccess(output))
     }
 
+    @Test
+    fun `record-update accepts success line containing word invalid`() {
+        val output = "1 record(s) updated (skipped: 2 invalid fields)"
+        assertTrue(KeeperRecordOutputValidators.isRecordUpdateSuccess(output))
+    }
+
     // --- helper detectors --------------------------------------------------
 
     @Test

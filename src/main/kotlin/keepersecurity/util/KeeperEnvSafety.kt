@@ -97,9 +97,6 @@ object KeeperEnvSafety {
         if (value.any { it in FORBIDDEN_VALUE_CHARS }) {
             return "value contains control characters (newline or null byte)"
         }
-        if (value.startsWith("-")) {
-            return "value looks like an interpreter flag (starts with '-')"
-        }
         if (value.contains("$(")) {
             return "value contains command substitution (\$(...))"
         }
@@ -116,5 +113,33 @@ object KeeperEnvSafety {
         blockedEnvKeyReason(key)?.let { return Verdict.Blocked(key, it) }
         blockedEnvValueReason(value)?.let { return Verdict.Blocked(key, it) }
         return Verdict.Allowed(key, value)
+    }
+
+    private val PRESERVED_UNIX_ENV_KEYS = listOf(
+        "PATH", "HOME", "USER", "SHELL", "LANG", "LC_ALL", "TMPDIR",
+    )
+
+    private val PRESERVED_WINDOWS_ENV_KEYS = listOf(
+        "PATH", "USERPROFILE", "SystemRoot", "TEMP", "TMP", "ComSpec",
+    )
+
+    /**
+     * Build the subprocess environment for Run Keeper Securely: validated vault
+     * secrets plus a minimal whitelist from the parent IDE process. The full
+     * inherited env is not copied — hook variables already present in the IDE
+     * (NODE_OPTIONS, LD_PRELOAD, DYLD_*, etc.) must not leak into the child.
+     */
+    fun buildSubprocessEnvironment(
+        inherited: Map<String, String>,
+        injected: Map<String, String>,
+        isWindows: Boolean,
+    ): Map<String, String> {
+        val env = linkedMapOf<String, String>()
+        injected.forEach { (k, v) -> env[k] = v }
+        val preservedKeys = if (isWindows) PRESERVED_WINDOWS_ENV_KEYS else PRESERVED_UNIX_ENV_KEYS
+        preservedKeys.forEach { key ->
+            inherited[key]?.let { env[key] = it }
+        }
+        return env
     }
 }

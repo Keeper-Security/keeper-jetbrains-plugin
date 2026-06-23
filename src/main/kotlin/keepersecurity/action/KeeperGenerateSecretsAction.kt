@@ -245,7 +245,7 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
         return try {
             // The password literal is the same for both branches; it must be
             // single-quoted so the CLI doesn't try to expand $-prefixed chars.
-            val passwordField = "password='$password'"
+            val passwordField = "password='${KeeperCliSafety.escapeSingleQuoted(password)}'"
             val command = when (target) {
                 is GenerateTarget.Classic -> buildClassicAddCommand(title, passwordField, target.folderUuid)
                 is GenerateTarget.Drive -> buildDriveAddCommand(title, passwordField, target.folderUuid)
@@ -291,9 +291,10 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
      * Classic Vault root" — no `--folder` flag emitted.
      */
     private fun buildClassicAddCommand(title: String, passwordField: String, classicFolderUuid: String?): String {
+        val escTitle = KeeperCliSafety.escapeDoubleQuoted(title)
         val parts = mutableListOf(
             "record-add",
-            "--title=\"$title\"",
+            "--title=\"$escTitle\"",
             "--record-type=login"
         )
         if (!classicFolderUuid.isNullOrBlank()) {
@@ -312,9 +313,10 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
      * uses the shared `field=value` syntax.
      */
     private fun buildDriveAddCommand(title: String, passwordField: String, driveFolderUuid: String?): String {
+        val escTitle = KeeperCliSafety.escapeDoubleQuoted(title)
         val parts = mutableListOf(
             "nsf-record-add",
-            "--title", "\"$title\"",
+            "--title", "\"$escTitle\"",
             "--record-type", "login"
         )
         if (!driveFolderUuid.isNullOrBlank()) {

@@ -116,9 +116,9 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                         initialSelection = pickerItems.first()
                     ) ?: return@invokeLater
 
-                    val selectedRecord = recordChoices.find {
-                        it.title == selected.label && it.isNested == (selected.badge == KeeperVaultBadge.NESTED)
-                    } ?: recordChoices.find { it.toPickerItem() == selected }
+                    val selectedRecord = selected.id?.let { uid ->
+                        recordChoices.find { it.uid == uid }
+                    }
                     val selectedUid = selectedRecord?.uid ?: return@invokeLater
                     val selectedTitle = selectedRecord.title
 
@@ -389,6 +389,7 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
         fun toPickerItem() = KeeperListPickerItem(
             label = title,
             badge = if (isNested) KeeperVaultBadge.NESTED else KeeperVaultBadge.CLASSIC,
+            id = uid,
         )
     }
 }

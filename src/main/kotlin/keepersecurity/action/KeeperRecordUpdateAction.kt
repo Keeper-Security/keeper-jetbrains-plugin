@@ -154,9 +154,12 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
                     indicator.text = taskTitle
                     // Format the field properly for the shell command
                     val formattedField = if (fieldName in keeperStandardFields) {
-                        "$fieldName=\"$safeSelectionText\""
+                        val esc = KeeperCliSafety.escapeDoubleQuoted(safeSelectionText)
+                        "$fieldName=\"$esc\""
                     } else {
-                        "\"$fieldName\"=\"$safeSelectionText\""
+                        val escName = KeeperCliSafety.escapeDoubleQuoted(fieldName)
+                        val escValue = KeeperCliSafety.escapeDoubleQuoted(safeSelectionText)
+                        "\"$escName\"=\"$escValue\""
                     }
 
                     // Build the command without "keeper" prefix since we're in the shell.

@@ -29,21 +29,21 @@ object KeeperRecordOutputValidators {
      */
     private val SYNC_BANNER_MARKERS = listOf(
         "Decrypted [",
-        "record(s)",
+        "synced record(s)",
         "breachwatch list",
-        "Use \"breachwatch list\" command"
+        "Use \"breachwatch list\" command",
     )
 
     /**
      * Error markers that the CLI prints for explicit failure cases (auth,
-     * validation, command typos, nsf-* warnings aborting the create). All
-     * matching is case-insensitive to absorb capitalisation differences
-     * between Commander releases.
+     * validation, command typos, nsf-* warnings aborting the create). Simple
+     * substring markers are case-insensitive; [INVALID_PHRASE_PATTERNS] use
+     * word boundaries so success lines like "skipped: 2 invalid fields" are
+     * not treated as failures.
      */
     private val ERROR_MARKERS = listOf(
         "error",
         "failed",
-        "invalid",
         "not found",
         // `nsf-record-add` aborts on attachment / unknown-field warnings unless
         // `-f` is supplied; the abort line begins with "Warning:" or "Aborted".
@@ -51,11 +51,17 @@ object KeeperRecordOutputValidators {
         "aborted",
         // Older Commander builds that pre-date Nested Shared Folders reject
         // the nsf-* namespace with one of these phrases.
-        // Retrying won't help, but the resulting error message will be
-        // much clearer than "validation failed after N attempts".
         "unknown command",
         "no such command",
-        "command not found"
+        "command not found",
+    )
+
+    private val INVALID_PHRASE_PATTERNS = listOf(
+        Regex("""invalid record\b""", RegexOption.IGNORE_CASE),
+        Regex("""invalid uid\b""", RegexOption.IGNORE_CASE),
+        Regex("""invalid field\b""", RegexOption.IGNORE_CASE),
+        Regex("""invalid command\b""", RegexOption.IGNORE_CASE),
+        Regex("""invalid folder\b""", RegexOption.IGNORE_CASE),
     )
 
     /**
@@ -107,7 +113,8 @@ object KeeperRecordOutputValidators {
 
     /** Returns true when the output contains any of the known error markers. */
     fun looksLikeError(output: String): Boolean =
-        ERROR_MARKERS.any { output.contains(it, ignoreCase = true) }
+        ERROR_MARKERS.any { output.contains(it, ignoreCase = true) } ||
+            INVALID_PHRASE_PATTERNS.any { it.containsMatchIn(output) }
 
     /**
      * Returns true when the output looks like an unrecoverable Commander

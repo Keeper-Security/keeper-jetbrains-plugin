@@ -57,6 +57,7 @@ class KeeperFolderSelectAction : AnAction("Get Keeper Folder") {
         fun toPickerItem() = KeeperListPickerItem(
             label = name,
             badge = if (isDrive) KeeperVaultBadge.NESTED else KeeperVaultBadge.CLASSIC,
+            id = uid,
         )
     }
 
@@ -105,8 +106,9 @@ class KeeperFolderSelectAction : AnAction("Get Keeper Folder") {
                         initialSelection = pickerItems.firstOrNull()
                     ) ?: return@invokeLater
 
-                    val selectedFolder = folderChoices.find { it.name == selected.label && it.isDrive == (selected.badge == KeeperVaultBadge.NESTED) }
-                        ?: folderChoices.find { it.toPickerItem() == selected }
+                    val selectedFolder = selected.id?.let { uid ->
+                        folderChoices.find { it.uid == uid }
+                    }
                     if (selectedFolder != null) {
                         persistFolderSelection(project, selectedFolder)
 

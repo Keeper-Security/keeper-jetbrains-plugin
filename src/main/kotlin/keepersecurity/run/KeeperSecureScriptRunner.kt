@@ -194,7 +194,9 @@ object KeeperSecureScriptRunner {
             pb.directory(fileParentDir)
 
             val env = pb.environment()
-            env.putAll(envVars)
+            val subprocessEnv = KeeperEnvSafety.buildSubprocessEnvironment(env, envVars, SystemInfo.isWindows)
+            env.clear()
+            env.putAll(subprocessEnv)
 
             logger.info("Running script with ${envVars.size} injected secrets")
             logger.info("Working directory: ${fileParentDir.absolutePath}")

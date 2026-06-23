@@ -201,9 +201,10 @@ class KeeperRecordAddAction : AnAction("Add Keeper Record") {
      * `--folder` flag emitted.
      */
     private fun buildClassicAddCommand(title: String, formattedField: String, classicFolderUuid: String?): String {
+        val escTitle = KeeperCliSafety.escapeDoubleQuoted(title)
         val parts = mutableListOf(
             "record-add",
-            "--title=\"$title\"",
+            "--title=\"$escTitle\"",
             "--record-type=login"
         )
         if (!classicFolderUuid.isNullOrBlank()) {
@@ -218,9 +219,10 @@ class KeeperRecordAddAction : AnAction("Add Keeper Record") {
 
     private fun buildDriveAddCommand(title: String, formattedField: String, driveFolderUuid: String?): String {
         // `nsf-record-add` uses space-separated flag form per the Nested Shared Folders docs.
+        val escTitle = KeeperCliSafety.escapeDoubleQuoted(title)
         val parts = mutableListOf(
             "nsf-record-add",
-            "--title", "\"$title\"",
+            "--title", "\"$escTitle\"",
             "--record-type", "login"
         )
         if (!driveFolderUuid.isNullOrBlank()) {
@@ -236,14 +238,17 @@ class KeeperRecordAddAction : AnAction("Add Keeper Record") {
     private fun formatField(fieldName: String, selectedText: String): String = when {
         fieldName == "password" && selectedText.startsWith("\$GEN", ignoreCase = true) -> {
             // Special case: random password generation
-            "$fieldName='$selectedText'"
+            "$fieldName='${KeeperCliSafety.escapeSingleQuoted(selectedText)}'"
         }
         fieldName in keeperStandardFields -> {
-            "$fieldName=\"$selectedText\""
+            val esc = KeeperCliSafety.escapeDoubleQuoted(selectedText)
+            "$fieldName=\"$esc\""
         }
         else -> {
             // Custom field
-            "\"$fieldName\"=\"$selectedText\""
+            val escName = KeeperCliSafety.escapeDoubleQuoted(fieldName)
+            val escValue = KeeperCliSafety.escapeDoubleQuoted(selectedText)
+            "\"$escName\"=\"$escValue\""
         }
     }
 
