@@ -81,4 +81,40 @@ class KeeperRecordAddActionTest {
         
         assertEquals("Both instances should have same standard fields", fields1, fields2)
     }
+
+    @Test
+    fun `test action exposes Classic and Drive AddTarget branches`() {
+        // The AddTarget sealed class is the dispatch surface between the
+        // classic `record-add` and `nsf-record-add` branches inside the
+        // action. Loading both nested classes by name ensures a future
+        // refactor doesn't silently delete a branch.
+        val classicTarget = Class.forName(
+            "keepersecurity.action.KeeperRecordAddAction\$AddTarget\$Classic"
+        )
+        val driveTarget = Class.forName(
+            "keepersecurity.action.KeeperRecordAddAction\$AddTarget\$Drive"
+        )
+        assertNotNull("Classic AddTarget branch should exist", classicTarget)
+        assertNotNull("Drive AddTarget branch should exist", driveTarget)
+    }
+
+    @Test
+    fun `test action declares Drive command builder`() {
+        val method = KeeperRecordAddAction::class.java.declaredMethods
+            .firstOrNull { it.name == "buildDriveAddCommand" }
+        assertNotNull(
+            "Drive command builder should be declared on the action",
+            method
+        )
+    }
+
+    @Test
+    fun `test action declares Classic command builder for the classic branch`() {
+        val method = KeeperRecordAddAction::class.java.declaredMethods
+            .firstOrNull { it.name == "buildClassicAddCommand" }
+        assertNotNull(
+            "Classic command builder should still be present after the Drive refactor",
+            method
+        )
+    }
 }

@@ -9,6 +9,8 @@ import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
+import com.intellij.openapi.ui.Messages
+import keepersecurity.util.KeeperEnvSafety
 import java.io.File
 
 class KeeperSecureRunProfileState(
@@ -27,6 +29,15 @@ class KeeperSecureRunProfileState(
         } else {
             KeeperSecurePathUtil.resolveToFile(wdPath, base)
         }
+        if (KeeperEnvSafety.shouldShowFirstRunWarning()) {
+            Messages.showWarningDialog(
+                project,
+                KeeperEnvSafety.FIRST_RUN_WARNING_MESSAGE,
+                "Run Keeper Securely",
+            )
+            KeeperEnvSafety.markFirstRunWarningShown()
+        }
+
         val handler = KeeperSecureProcessHandler(project, envFile, workDir, opts.command.orEmpty())
         val console = TextConsoleBuilderFactory.getInstance().createBuilder(project).console
         console.attachToProcess(handler)

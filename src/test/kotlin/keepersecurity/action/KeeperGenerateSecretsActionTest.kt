@@ -55,4 +55,29 @@ class KeeperGenerateSecretsActionTest {
             action1.templatePresentation.text, 
             action2.templatePresentation.text)
     }
+
+    @Test
+    fun `test action exposes Classic and Drive GenerateTarget branches`() {
+        val classicTarget = Class.forName(
+            "keepersecurity.action.KeeperGenerateSecretsAction\$GenerateTarget\$Classic"
+        )
+        val driveTarget = Class.forName(
+            "keepersecurity.action.KeeperGenerateSecretsAction\$GenerateTarget\$Drive"
+        )
+        assertNotNull("Classic GenerateTarget branch should exist", classicTarget)
+        assertNotNull("Drive GenerateTarget branch should exist", driveTarget)
+    }
+
+    @Test
+    fun `test action declares Drive and Classic record-add command builders`() {
+        val methods = KeeperGenerateSecretsAction::class.java.declaredMethods.map { it.name }
+        assertTrue(
+            "Classic command builder should be declared",
+            methods.any { it == "buildClassicAddCommand" }
+        )
+        assertTrue(
+            "Drive command builder should be declared",
+            methods.any { it == "buildDriveAddCommand" }
+        )
+    }
 }

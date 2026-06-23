@@ -22,28 +22,52 @@ import keepersecurity.model.getDisplayValue
 import keepersecurity.util.KeeperJsonUtils
 import kotlinx.serialization.ExperimentalSerializationApi
 import keepersecurity.util.KeeperCommandUtils
+import keepersecurity.ui.KeeperListPickerDialog
+import keepersecurity.ui.KeeperListPickerItem
+import keepersecurity.ui.KeeperVaultBadge
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
+/**
+ * Unified secret picker. Commander's `list --format json` returns both
+ * Classic and Nested Shared records in a single payload (each row carries
+ * a `record_category` discriminator), so a single menu item covers both vault
+ * models — no Nested Shared Folder-specific subclass is needed. Each row
+ * shows the record title with a Classic or Nested badge.
+ *
+ * The `keeper://<uid>/field/<field>` notation accepts both Classic and
+ * Nested Shared record UIDs, so the editor-insertion path doesn't fork on
+ * source.
+ */
 @OptIn(ExperimentalSerializationApi::class)
 class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
+
+    private val taskTitle = "Fetching Keeper Secrets..."
+    private val recordPickerTitle = "Keeper Records"
+    private val emptyRecordsMessage = "No Keeper records found."
+
     private val logger = thisLogger()
 
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project = e.project ?: return
         val editor: Editor = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.EDITOR) ?: return
 
-        object : Task.Backgroundable(project, "Fetching Keeper Secrets...", false) {
+        object : Task.Backgroundable(project, taskTitle, false) {
             override fun run(indicator: ProgressIndicator) {
                 
 
                 // Step 1: Get list of records using persistent shell with retry logic
                 val startTime = System.currentTimeMillis()
+
+                indicator.text = "Syncing with Keeper vault..."
+                KeeperCommandUtils.syncDownBestEffort(logger)
+
+                indicator.text = "Fetching Keeper records..."
                 val listJson = try {
                     // Add retry logic for the first run
                     KeeperCommandUtils.executeCommandWithRetry(
-                        "list --format json", 
+                        "list --format json",
                         KeeperCommandUtils.Presets.jsonArray(maxRetries = 3),
                         logger
                     )
@@ -66,34 +90,38 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
                     return
                 }
 
-                val titles = mutableListOf<String>()
-                val uidByTitle = mutableMapOf<String, String>()
-                records.forEach { rec ->
-                    val title = rec.title.ifBlank { "Untitled" }
+                // Build picker rows with Classic / Nested badges.
+                val recordChoices = records.mapNotNull { rec ->
                     val uid = rec.recordUid
-                    if (uid.isNotBlank()) {
-                        titles.add(title)
-                        uidByTitle[title] = uid
-                    }
+                    if (uid.isBlank()) return@mapNotNull null
+                    RecordChoice(
+                        title = rec.title.ifBlank { "Untitled" },
+                        uid = uid,
+                        isNested = rec.isKeeperDrive,
+                    )
                 }
 
-                if (titles.isEmpty()) {
-                    showInfo(project, "No Keeper records found.")
+                if (recordChoices.isEmpty()) {
+                    showInfo(project, emptyRecordsMessage)
                     return
                 }
 
                 // Step 2: Ask user to select record (UI thread)
                 ApplicationManager.getApplication().invokeLater {
-                    val selectedTitle = Messages.showEditableChooseDialog(
-                        "Select Keeper Record:",
-                        "Keeper Records",
-                        null,
-                        titles.toTypedArray(),
-                        titles.first(),
-                        null
+                    val pickerItems = recordChoices.map { it.toPickerItem() }
+                    val selected = KeeperListPickerDialog.pickItem(
+                        project = project,
+                        title = recordPickerTitle,
+                        message = "Select a Keeper record (Classic or Nested Shared Folder):",
+                        options = pickerItems,
+                        initialSelection = pickerItems.first()
                     ) ?: return@invokeLater
 
-                    val selectedUid = uidByTitle[selectedTitle] ?: return@invokeLater
+                    val selectedRecord = recordChoices.find {
+                        it.title == selected.label && it.isNested == (selected.badge == KeeperVaultBadge.NESTED)
+                    } ?: recordChoices.find { it.toPickerItem() == selected }
+                    val selectedUid = selectedRecord?.uid ?: return@invokeLater
+                    val selectedTitle = selectedRecord.title
 
                     // Step 3: Fetch selected record details (background again)
                     object : Task.Backgroundable(project, "Fetching Record Details...", false) {
@@ -243,13 +271,13 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
 
                             // Step 4: Ask user to pick field (UI thread)
                             ApplicationManager.getApplication().invokeLater {
-                                val selectedFieldDisplay = Messages.showEditableChooseDialog(
-                                    "Select field from record '$selectedTitle':",
-                                    "Keeper Record Fields",
-                                    null,
-                                    fieldOptions.map { it.first }.toTypedArray(),
-                                    fieldOptions.first().first,
-                                    null
+                                val fieldLabels = fieldOptions.map { it.first }
+                                val selectedFieldDisplay = KeeperListPickerDialog.pick(
+                                    project = project,
+                                    title = "Keeper Record Fields",
+                                    message = "Select field from record '$selectedTitle':",
+                                    options = fieldLabels,
+                                    initialSelection = fieldLabels.first()
                                 ) ?: return@invokeLater
 
                                 val selectedFieldKey = fieldOptions.find { it.first == selectedFieldDisplay }?.second ?: return@invokeLater
@@ -352,5 +380,16 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
         ApplicationManager.getApplication().invokeLater {
             Messages.showInfoMessage(project, message, "Info")
         }
+    }
+
+    private data class RecordChoice(
+        val title: String,
+        val uid: String,
+        val isNested: Boolean,
+    ) {
+        fun toPickerItem() = KeeperListPickerItem(
+            label = title,
+            badge = if (isNested) KeeperVaultBadge.NESTED else KeeperVaultBadge.CLASSIC,
+        )
     }
 }

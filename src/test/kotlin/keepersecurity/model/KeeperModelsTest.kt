@@ -319,6 +319,157 @@ class KeeperModelsTest {
     }
 
     @Test
+    fun `KeeperFolder isKeeperDrive returns true for nested_share_folder source`() {
+        val folder = KeeperFolder(
+            folderUid = "drive-folder-123",
+            name = "Keeper Drive Test folder",
+            source = KeeperFolder.SOURCE_NESTED_SHARE_FOLDER
+        )
+        assertTrue(folder.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder isKeeperDrive returns false for classic_folder source`() {
+        val folder = KeeperFolder(
+            folderUid = "classic-folder-123",
+            name = "kcm-creds",
+            source = KeeperFolder.SOURCE_CLASSIC_FOLDER
+        )
+        assertFalse(folder.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder parses newer classic_folder and nested_share_folder list`() {
+        val raw = """
+        [
+            {
+                "type": "folder",
+                "uid": "y2cG8GbSF3k_TT0D-EOH1w",
+                "name": "kcm-creds",
+                "source": "classic_folder"
+            },
+            {
+                "type": "folder",
+                "uid": "2zHC3Umb41PnVECFZxYTXw",
+                "name": "Keeper Drive Test folder",
+                "source": "nested_share_folder"
+            }
+        ]
+        """
+        val folders = json.decodeFromString<List<KeeperFolder>>(raw)
+        assertEquals(2, folders.size)
+        assertFalse(folders[0].isKeeperDrive)
+        assertTrue(folders[1].isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder isKeeperDrive returns true for KeeperDrive source`() {
+        val folder = KeeperFolder(
+            folderUid = "drive-folder-123",
+            name = "Drive Folder",
+            source = KeeperFolder.SOURCE_KEEPER_DRIVE
+        )
+        assertTrue(folder.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder isKeeperDrive returns false for Legacy source`() {
+        val folder = KeeperFolder(
+            folderUid = "legacy-folder-123",
+            name = "Legacy Folder",
+            source = KeeperFolder.SOURCE_LEGACY
+        )
+        assertFalse(folder.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder isKeeperDrive returns false when source is missing`() {
+        val folder = KeeperFolder(folderUid = "old-folder", name = "Old Folder")
+        assertFalse(folder.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder isKeeperDrive is case-insensitive`() {
+        val folder = KeeperFolder(
+            folderUid = "drive-folder-123",
+            name = "Drive Folder",
+            source = "keeperdrive"
+        )
+        assertTrue(folder.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperFolder parses mixed Legacy and KeeperDrive list`() {
+        val raw = """
+        [
+            {
+                "uid": "legacy-folder-uid-1234",
+                "name": "Legacy Folder",
+                "source": "Legacy"
+            },
+            {
+                "uid": "drive-folder-uid-1234",
+                "name": "Drive Folder",
+                "source": "KeeperDrive"
+            }
+        ]
+        """
+        val folders = json.decodeFromString<List<KeeperFolder>>(raw)
+        assertEquals(2, folders.size)
+        assertFalse(folders[0].isKeeperDrive)
+        assertTrue(folders[1].isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperRecord isKeeperDrive returns true for Nested record_category`() {
+        val record = KeeperRecord(
+            recordUid = "FnxkikNsz2W7OyqDB9fTAg",
+            title = "iTerm2NSFRec",
+            recordCategory = KeeperRecord.CATEGORY_NESTED
+        )
+        assertTrue(record.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperRecord isKeeperDrive returns true for KeeperDrive record_category`() {
+        val record = KeeperRecord(
+            recordUid = "drive-record-uid-12345",
+            title = "Drive Record",
+            recordCategory = KeeperRecord.CATEGORY_KEEPER_DRIVE
+        )
+        assertTrue(record.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperRecord isKeeperDrive returns false for Classic or missing record_category`() {
+        val classic = KeeperRecord(
+            recordUid = "classic-record-uid-123",
+            title = "Classic Record",
+            recordCategory = KeeperRecord.CATEGORY_CLASSIC
+        )
+        val noCategory = KeeperRecord(recordUid = "old-record-uid-12345", title = "Old Record")
+        assertFalse(classic.isKeeperDrive)
+        assertFalse(noCategory.isKeeperDrive)
+    }
+
+    @Test
+    fun `KeeperRecord parses real list --format json output with record_category`() {
+        // Field name + values straight from `list --format json` (Commander
+        // emits `record_category` with "Classic" / "KeeperDrive" — note this
+        // differs from the folder side's `source` / "Legacy").
+        val raw = """
+        [
+            {"record_uid": "classic-rec-uid-1234", "title": "Classic Rec", "record_category": "Classic"},
+            {"record_uid": "drive-rec-uid-123456",  "title": "Drive Rec",   "record_category": "KeeperDrive"}
+        ]
+        """
+        val records = json.decodeFromString<List<KeeperRecord>>(raw)
+        assertEquals(2, records.size)
+        assertFalse(records[0].isKeeperDrive)
+        assertTrue(records[1].isKeeperDrive)
+    }
+
+    @Test
     fun `test GeneratedPassword from real generate command`() {
         val generateOutput = """
         [

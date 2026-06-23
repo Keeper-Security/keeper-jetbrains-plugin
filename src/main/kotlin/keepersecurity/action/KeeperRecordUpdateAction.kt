@@ -14,7 +14,10 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.TextRange
 import keepersecurity.service.KeeperShellService
+import keepersecurity.util.KeeperCliSafety
 import keepersecurity.util.KeeperCommandUtils
+import keepersecurity.util.KeeperRecordOutputValidators
+import keepersecurity.util.KeeperRecordValidator
 
 class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
     private val logger = thisLogger()
@@ -58,19 +61,66 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
             return
         }
 
-        val recordUid = Messages.showInputDialog(
+        val safeSelectionText = try {
+            KeeperCliSafety.requireSafe(selectionData.text!!, "selected value")
+        } catch (ex: KeeperCliSafety.UnsafeCliInputException) {
+            showError(ex.message ?: "Selected value is not safe to send to Keeper.", project)
+            return
+        }
+
+        val rawRecordUid = Messages.showInputDialog(
             project,
             "Enter Keeper record UID:",
             "Record UID",
             null
         )?.trim()
 
-        if (recordUid.isNullOrBlank()) {
+        if (rawRecordUid.isNullOrBlank()) {
             showError("Record UID is required", project)
             return
         }
 
-        val fieldName = Messages.showInputDialog(
+        val recordUid = try {
+            KeeperCliSafety.requireSafe(rawRecordUid, "record UID")
+        } catch (ex: KeeperCliSafety.UnsafeCliInputException) {
+            showError(ex.message ?: "Record UID is not safe.", project)
+            return
+        }
+
+        // Look up the UID in the vault to decide which CLI command to use.
+        // `list --format json` includes a `record_category` discriminator
+        // (`Classic` / `Nested`, plus older legacy wire values) that maps 1:1 onto
+        // `record-update` vs `nsf-record-update`, so the user never has to tell us
+        // which namespace their UID lives in.
+        // The lookup also rejects typo'd or deleted UIDs up-front instead
+        // of letting them surface as a confusing "record not found"
+        // mid-update.
+        val isDrive = when (val verdict = KeeperRecordValidator.lookupRecord(project, recordUid)) {
+            is KeeperRecordValidator.Verdict.Found -> {
+                logger.info("Auto-dispatching update for record '${verdict.title}' ($recordUid) " +
+                    "to ${if (verdict.kind == KeeperRecordValidator.Kind.DRIVE) "Nested Shared Folder" else "Classic Vault"}")
+                verdict.kind == KeeperRecordValidator.Kind.DRIVE
+            }
+            is KeeperRecordValidator.Verdict.NotFound -> {
+                showError(
+                    "Record UID '$recordUid' was not found in your vault. " +
+                        "Double-check the value (Tools \u2192 Keeper Vault \u2192 Get Keeper Secret " +
+                        "lists every record with its UID).",
+                    project
+                )
+                return
+            }
+            is KeeperRecordValidator.Verdict.Unknown -> {
+                showError(
+                    "Couldn't verify the record UID against your vault " +
+                        "(${verdict.reason}). Make sure Keeper Commander is healthy and try again.",
+                    project
+                )
+                return
+            }
+        }
+
+        val rawFieldName = Messages.showInputDialog(
             project,
             "Enter Keeper field name (e.g., login, password, url, or custom):",
             "Field Name",
@@ -79,30 +129,46 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
             null
         )?.trim()
 
-        if (fieldName.isNullOrBlank()) {
+        if (rawFieldName.isNullOrBlank()) {
             showError("Field name is required", project)
             return
         }
 
+        val fieldName = try {
+            KeeperCliSafety.requireSafe(rawFieldName, "field name")
+        } catch (ex: KeeperCliSafety.UnsafeCliInputException) {
+            showError(ex.message ?: "Field name is not safe.", project)
+            return
+        }
+
+        val taskTitle = if (isDrive) "Updating Nested Shared Record..." else "Updating Keeper Record..."
         // Execute the update in background using persistent shell
-        object : Task.Backgroundable(project, "Updating Keeper Record...", false) {
+        object : Task.Backgroundable(project, taskTitle, false) {
             override fun run(indicator: ProgressIndicator) {
-                
-                
                 try {
                     val startTime = System.currentTimeMillis()
-                    
+
+                    indicator.text = "Syncing with Keeper vault..."
+                    KeeperCommandUtils.syncDownBestEffort(logger)
+
+                    indicator.text = taskTitle
                     // Format the field properly for the shell command
                     val formattedField = if (fieldName in keeperStandardFields) {
-                        "$fieldName=\"${selectionData.text}\""
+                        "$fieldName=\"$safeSelectionText\""
                     } else {
-                        "\"$fieldName\"=\"${selectionData.text}\""
+                        "\"$fieldName\"=\"$safeSelectionText\""
                     }
 
-                    // Build the command without "keeper" prefix since we're in the shell
-                    val command = "record-update --record=\"$recordUid\" $formattedField"
+                    // Build the command without "keeper" prefix since we're in the shell.
+        // Classic uses `record-update --record="UID"`; Nested Shared Folders
+        // uses `nsf-record-update -r <UID>` per the nsf-* docs.
+                    val command = if (isDrive) {
+                        "nsf-record-update -r \"$recordUid\" $formattedField"
+                    } else {
+                        "record-update --record=\"$recordUid\" $formattedField"
+                    }
                     
-                    logger.info("Executing record update: $command")
+                    logger.info("Issuing ${command.substringBefore(' ')} for record $recordUid")
                     
                     // Execute with retry logic for reliability
                     val output = KeeperCommandUtils.executeCommandWithRetry(
@@ -113,32 +179,16 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
                             retryDelayMs = 2000, // Longer delay between retries
                             logLevel = KeeperCommandUtils.LogLevel.INFO,
                             validation = KeeperCommandUtils.ValidationConfig(
-                                customValidator = { output ->
-                                    // For record-update, empty/minimal output often means success
-                                    // We should REJECT output that contains sync status or errors
-                                    val isSyncStatus = output.contains("Decrypted [") || 
-                                                    output.contains("record(s)") ||
-                                                    output.contains("breachwatch list") ||
-                                                    output.contains("Use \"breachwatch list\" command")
-                                    
-                                    val isErrorMessage = output.contains("error", ignoreCase = true) ||
-                                                    output.contains("failed", ignoreCase = true) ||
-                                                    output.contains("invalid", ignoreCase = true) ||
-                                                    output.contains("not found", ignoreCase = true)
-                                    
-                                    // Success means: no sync status AND no error messages
-                                    // Empty output is actually GOOD for record-update
-                                    val isValid = !isSyncStatus && !isErrorMessage
-                                    
-                                    if (!isValid) {
-                                        logger.debug("Record update validation failed - isSyncStatus: $isSyncStatus, isErrorMessage: $isErrorMessage")
-                                        logger.debug("Output: ${output.take(200)}...")
+                                customValidator = { out ->
+                                    val ok = KeeperRecordOutputValidators.isRecordUpdateSuccess(out)
+                                    if (!ok) {
+                                        logger.debug("Record update validation failed for output: ${out.take(200)}...")
                                     } else {
-                                        logger.debug("Record update validation passed - output length: ${output.length}")
+                                        logger.debug("Record update validation passed - output length: ${out.length}")
                                     }
-                                    
-                                    isValid
-                                }
+                                    ok
+                                },
+                                fatalErrorDetector = KeeperRecordOutputValidators::isFatalError
                             )
                         ),
                         logger
@@ -155,13 +205,24 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
                             document.replaceString(selectionData.start!!, selectionData.end!!, keeperReference)
                             FileDocumentManager.getInstance().saveDocument(document)
                         }
+                        val source = if (isDrive) "Nested Shared record" else "Keeper record"
                         Messages.showInfoMessage(
-                            project, 
-                            "Keeper record updated!\n\n$keeperReference", 
+                            project,
+                            "$source updated!\n\n$keeperReference",
                             "Keeper Record Updated"
                         )
                     }, ModalityState.defaultModalityState())
 
+                } catch (fatal: KeeperCommandUtils.FatalCommandException) {
+                    logger.error("Keeper Commander reported a fatal error while updating the record", fatal)
+                    ApplicationManager.getApplication().invokeLater({
+                        showError(
+                            "Keeper Commander rejected the record-update call:\n\n${fatal.message}\n\n" +
+                                "This usually means the installed Keeper Commander build does not support the " +
+                                "command we issued. Try upgrading Commander (`pip install --upgrade keepercommander`).",
+                            project
+                        )
+                    }, ModalityState.defaultModalityState())
                 } catch (ex: Exception) {
                     logger.error("Error updating Keeper record via persistent shell", ex)
                     ApplicationManager.getApplication().invokeLater({

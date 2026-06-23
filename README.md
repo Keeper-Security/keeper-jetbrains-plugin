@@ -1,7 +1,7 @@
 # Keeper Security JetBrains Plugin
 
 <!-- Plugin description -->
-A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow. Use Keeper references in `.env` files and in **JetBrains HTTP Client** (`.http` files) where supported, save **Run Keeper Securely** run configurations, and use Tools-menu actions to manage secrets without pasting plaintext into your project.
+A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow. Supports **Classic** and **Nested Shared Folder** vault items in the same actions. Use Keeper references in `.env` files and in **JetBrains HTTP Client** (`.http` files) where supported, save **Run Keeper Securely** run configurations, and use Tools-menu actions to manage secrets without pasting plaintext into your project.
 
 The goal is to enable developers to manage secrets securely without leaving their development environment, while maintaining the highest security standards and providing seamless integration with existing Keeper Security infrastructure.
 
@@ -23,7 +23,7 @@ The goal is to enable developers to manage secrets securely without leaving thei
 
 ## Overview
 
-A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow: secret references in `.env` and **HTTP Client** requests, **Run Keeper Securely** from the Tools menu or as a saved run configuration, and vault actions from the editor.
+A comprehensive JetBrains IDE plugin that integrates Keeper Security vault functionality directly into your development workflow: secret references in `.env` and **HTTP Client** requests, **Run Keeper Securely** from the Tools menu or as a saved run configuration, and vault actions for **Classic** and **Nested Shared Folder** items from the editor.
 
 The goal is to enable developers to manage secrets securely without leaving their development environment, while maintaining the highest security standards and providing seamless integration with existing Keeper Security infrastructure.
 
@@ -36,7 +36,8 @@ The goal is to enable developers to manage secrets securely without leaving thei
 - **JetBrains HTTP Client** (optional): Reference vault values in `.http` files via the `$keeper(...)` dynamic variable where the HTTP Client plugin is bundled (e.g. IntelliJ IDEA Ultimate)
 - **Run configurations**: Save a **Run Keeper Securely** configuration (`.env` path, working directory, command) under **Run → Edit Configurations** with output in the Run tool window
 - **Fast Performance**: Uses persistent Keeper shell for blazing-fast secret operations
-- **Folder Management**: Select and manage Keeper vault folders for organized secret storage
+- **Nested Shared Folders**: Classic and Nested Shared folders and records in the same actions; automatic routing to `record-*` or `nsf-*` Commander commands
+- **Folder Management**: Select Classic or Nested Shared folders for organized secret storage
 - **Record Operations**: Create new records, update existing ones, and retrieve field references
 - **Comprehensive Logging**: Built-in logging system with detailed operation tracking
 - **Retry Logic**: Robust error handling with automatic retry for shell startup timing
@@ -46,6 +47,7 @@ The goal is to enable developers to manage secrets securely without leaving thei
 - **Keeper Commander CLI**: Must be installed and authenticated on your system
   - Download from [Keeper Commander Installation Guide](https://docs.keeper.io/commander/)
   - Authenticate using persistent login or biometric login
+  - **Nested Shared Folder** create/update flows need a recent Commander with `nsf-*` commands ([CLI reference](https://docs.keeper.io/keeperpam/commander-cli/command-reference/nested-shared-folder)). Run `pip install --upgrade keepercommander` if you see unknown `nsf-record-add` errors.
 - **Keeper Security Account**: Active subscription with vault access
 - **System Requirements**:
   - JetBrains IDE: **2024.3 or later** (`pluginSinceBuild = 243`)
@@ -89,11 +91,11 @@ All Keeper actions are available through two locations:
 | Action | Description | Use Case |
 |--------|-------------|----------|
 | Check Keeper Authorization | Verify Keeper CLI installation and authentication | Troubleshoot connection issues |
-| Get Keeper Secret | Insert existing secrets from vault as references | Retrieve stored secrets without exposing values |
+| Get Keeper Secret | Insert existing secrets (Classic or Nested Shared) as references | Retrieve stored secrets without exposing values |
 | Add Keeper Record | Create new vault record from selected text | Replace hardcoded secrets with vault references |
-| Update Keeper Record | Update existing vault record and replace text | Modify existing secret values |
+| Update Keeper Record | Update existing record by UID and replace text | Modify existing secret values |
 | Generate Keeper Secret | Generate secure passwords and store in vault | Create new secure credentials |
-| Get Keeper Folder | Select vault folder for organized storage | Choose storage location for new records |
+| Get Keeper Folder | Select Classic or Nested Shared folder for this project | Choose storage location for new records |
 | Run Keeper Securely | Run a command with secrets from `.env` (Tools menu or saved run configuration) | Run applications or scripts with vault-backed env vars |
 
 ### Command Details
@@ -113,8 +115,8 @@ All Keeper actions are available through two locations:
 **Steps**:
 1. Position cursor where you want to insert the secret reference (including inside a `.http` file, when using HTTP Client)
 2. Right-click → `Get Keeper Secret` or `Tools → Keeper Vault → Get Keeper Secret`
-3. Plugin shows list of available vault records
-4. Select the specific record you want to use
+3. Plugin shows a searchable list of vault records (Classic and Nested Shared), each with a **Classic** or **Nested** badge
+4. Select the record you want to use
 5. Choose the field from that record
 6. Plugin inserts the appropriate reference at the cursor (e.g. `keeper://…` in `.env`/code, or an HTTP Client snippet in `.http` files where supported)
 
@@ -135,10 +137,10 @@ database_password = keeper://abc123def456/field/password
 **Steps**:
 1. Select text containing a secret (password, token, API key, etc.)
 2. Right-click → `Add Keeper Record` or `Tools → Keeper Vault → Add Keeper Record`
-3. Enter record title when prompted
-4. Enter field name for the secret
-5. Plugin creates new vault record
-6. Selected text is replaced with secret reference
+3. Run **Get Keeper Folder** first if you want new records in a specific Classic or Nested Shared folder (otherwise the vault root is used)
+4. Enter record title when prompted
+5. Enter field name for the secret
+6. Plugin creates the record in the correct vault (Classic or Nested Shared) and replaces the selection with a secret reference
 
 **Example**:
 ```javascript
@@ -153,12 +155,11 @@ const apiKey = keeper://new-record-uid/field/api_key;
 **Purpose**: Update an existing Keeper record with new secret value and replace selected text with reference.
 
 **Steps**:
-1. Select text containing the updated secret value
+1. Select text containing the updated secret value (or place the caret on the value after `=`)
 2. Right-click → `Update Keeper Record`
-3. Choose existing record from the list
-4. Select field to update
-5. Plugin updates the vault record
-6. Selected text is replaced with reference
+3. Enter the Keeper **record UID** when prompted
+4. Enter the **field name** to update
+5. Plugin validates the UID, updates the record in the correct vault (Classic or Nested Shared), and replaces the selection with a `keeper://` reference
 
 #### Generate Keeper Secret
 **Purpose**: Generate secure passwords and store them in Keeper Security vault.
@@ -166,9 +167,9 @@ const apiKey = keeper://new-record-uid/field/api_key;
 **Steps**:
 1. Position cursor where you want the secret reference
 2. Right-click → `Generate Keeper Secret`
-3. Enter record title and field name
-4. Plugin generates secure password and stores it in vault
-5. Secret reference is inserted at cursor position
+3. Run **Get Keeper Folder** first if you want the new record in a specific Classic or Nested Shared folder
+4. Enter record title and field name when prompted
+5. Plugin generates a secure password, stores it in the correct vault, and inserts a secret reference at the cursor
 
 **Example**:
 ```yaml
@@ -180,13 +181,12 @@ admin_password: keeper://generated-record-uid/field/password
 ```
 
 #### Get Keeper Folder
-**Purpose**: Select the vault folder where new secrets will be stored for this project.
+**Purpose**: Select a Classic or Nested Shared folder for this project (used by **Add Keeper Record** and **Generate Keeper Secret**).
 
 **Steps**:
 1. Go to `Tools → Keeper Vault → Get Keeper Folder`
-2. Plugin displays available vault folders
-3. Select desired folder for this workspace
-4. Future `Add Keeper Record` and `Generate Keeper Secret` operations will use this folder
+2. Search and pick a folder; each row shows a **Classic** or **Nested** badge
+3. The selection is saved for this project; add and generate actions use the matching Commander command family (`record-*` or `nsf-*`)
 
 #### Run Keeper Securely
 **Purpose**: Run commands with secrets injected from Keeper Security vault through `.env` file processing (`keeper://…` references are resolved at run time).
@@ -212,6 +212,8 @@ DATABASE_URL=keeper://db-record-uid/field/connection_string
 API_KEY=keeper://api-record-uid/field/key
 SECRET_KEY=keeper://app-record-uid/field/secret
 ```
+
+Record UIDs in `keeper://` references must be valid Keeper record UIDs (22 URL-safe Base64 characters: `A-Z`, `a-z`, `0-9`, `_`, `-`). Invalid UIDs are skipped with an error message.
 
 **Command execution** (conceptually):
 ```bash
@@ -298,7 +300,7 @@ If you encounter issues, enable detailed logging:
 **Problem**: Commands don't have access to injected secrets or fail to execute
 
 **Solutions**:
-- Verify your `.env` file contains valid `keeper://` references
+- Verify your `.env` file contains valid `keeper://` references with 22-character record UIDs
 - Ensure all referenced secrets exist in your vault
 - For **Run → Run Keeper Securely**, confirm paths and working directory in **Edit Configurations**
 - For the **Tools** menu flow, check the result dialog and logs if the command fails

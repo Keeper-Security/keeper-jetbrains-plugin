@@ -12,9 +12,10 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.ide.util.PropertiesComponent
+import keepersecurity.util.KeeperCliSafety
 import keepersecurity.util.KeeperCommandUtils
 import keepersecurity.util.KeeperJsonUtils
+import keepersecurity.util.KeeperRecordOutputValidators
 import kotlinx.serialization.json.Json  
 import kotlinx.serialization.decodeFromString
 import keepersecurity.model.GeneratedPassword
@@ -32,8 +33,17 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
         val selectionStart = caret.selectionStart
         val selectionEnd = caret.selectionEnd
 
+        // Ask whether the generated record should land in the Classic vault or
+        // Nested Shared Folders before collecting any more input. The dialog title
+        // matches the action label so the user knows what they're configuring.
+        val target = when (val outcome = KeeperRecordTargetPrompt.promptForGenerateTarget(project)) {
+            is KeeperRecordTargetPrompt.AddOutcome.Cancelled -> return
+            is KeeperRecordTargetPrompt.AddOutcome.Classic -> GenerateTarget.Classic(outcome.folderUuid, outcome.folderName)
+            is KeeperRecordTargetPrompt.AddOutcome.Drive -> GenerateTarget.Drive(outcome.folderUuid, outcome.folderName)
+        }
+
         // Prompt for title *on the EDT* before background work
-        val title = Messages.showInputDialog(
+        val rawTitle = Messages.showInputDialog(
             project,
             "Enter Keeper record title:",
             "Record Title",
@@ -43,14 +53,28 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
             return
         }
 
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Generating Keeper Secret", false) {
+        val title = try {
+            KeeperCliSafety.requireSafe(rawTitle, "record title")
+        } catch (ex: KeeperCliSafety.UnsafeCliInputException) {
+            showError(ex.message ?: "Record title is not safe.", project)
+            return
+        }
+
+        val taskTitle = when (target) {
+            is GenerateTarget.Classic -> "Generating Keeper Secret"
+            is GenerateTarget.Drive -> "Generating Nested Shared Secret"
+        }
+
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, taskTitle, false) {
             override fun run(indicator: ProgressIndicator) {
                 try {
-                    
-                    
+                    val startTime = System.currentTimeMillis()
+
+                    indicator.text = "Syncing with Keeper vault..."
+                    KeeperCommandUtils.syncDownBestEffort(logger)
+
                     // Generate password using persistent shell
                     indicator.text = "Generating password..."
-                    val startTime = System.currentTimeMillis()
                     
                     val password = generatePasswordWithRetry() ?: throw RuntimeException("Could not generate password.")
                     
@@ -61,7 +85,7 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
                     indicator.text = "Creating Keeper record..."
                     val recordStartTime = System.currentTimeMillis()
                     
-                    val recordUid = addKeeperRecordWithRetry(title, password, project)
+                    val recordUid = addKeeperRecordWithRetry(target, title, password, project)
                     
                     val recordDuration = System.currentTimeMillis() - recordStartTime
                     logger.info("Record creation completed in ${recordDuration}ms")
@@ -77,21 +101,41 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
                                 document.replaceString(selectionStart, selectionEnd, keeperReference)
                                 FileDocumentManager.getInstance().saveDocument(document)
                             }
+                            val location = when (target) {
+                                is GenerateTarget.Classic ->
+                                    target.folderName?.let { "Classic Vault · $it" } ?: "Classic Vault root"
+                                is GenerateTarget.Drive ->
+                                    target.folderName?.let { "Nested Shared Folder · $it" } ?: "Nested Shared Folder root"
+                            }
                             Messages.showInfoMessage(
                                 project,
-                                "Keeper record created!\n\n$keeperReference\n\nGenerated",
+                                "Keeper record created!\n\n$keeperReference\n\nGenerated in $location",
                                 "Keeper Secret Generated"
                             )
                         }
                     } else {
                         showError("Failed to create Keeper record.", project)
                     }
+                } catch (fatal: KeeperCommandUtils.FatalCommandException) {
+                    logger.error("Keeper Commander reported a fatal error while generating the secret", fatal)
+                    showError(
+                        "Keeper Commander rejected the call:\n\n${fatal.message}\n\n" +
+                            "This usually means the installed Keeper Commander build does not support the " +
+                            "command we issued. Try upgrading Commander (`pip install --upgrade keepercommander`) " +
+                            "or pick a Nested Shared Folder in the target prompt if you are generating a Nested Shared secret.",
+                        project
+                    )
                 } catch (ex: Exception) {
                     logger.error("Error generating Keeper secret", ex)
                     showError("Error: ${ex.message}", project)
                 }
             }
         })
+    }
+
+    private sealed class GenerateTarget {
+        data class Classic(val folderUuid: String?, val folderName: String?) : GenerateTarget()
+        data class Drive(val folderUuid: String?, val folderName: String?) : GenerateTarget()
     }
 
     private val json = Json {
@@ -129,7 +173,8 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
                             }
                             
                             isValid
-                        }
+                        },
+                        fatalErrorDetector = KeeperRecordOutputValidators::isFatalError
                     )
                 ),
                 logger
@@ -187,29 +232,26 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
     }
 
     /**
-     * Add Keeper record using persistent shell with retry logic
+     * Add Keeper record using persistent shell with retry logic.
+     *
+     * Routes to either the classic `record-add` command or the Nested
+     * Share Subfolders `nsf-record-add` command based on [target].
      */
-    private fun addKeeperRecordWithRetry(title: String, password: String, project: Project): String? {
+    private fun addKeeperRecordWithRetry(
+        target: GenerateTarget,
+        title: String,
+        password: String,
+        project: Project
+    ): String? {
         return try {
-            val props = PropertiesComponent.getInstance(project)
-            val folderUUID = props.getValue("keeper.folder.uuid")
-
-            // Build command without 'keeper' prefix (we're in the shell)
-            val cmdParts = mutableListOf(
-                "record-add",
-                "--title=\"$title\"",
-                "--record-type=login"
-            )
-
-            if (!folderUUID.isNullOrBlank()) {
-                cmdParts.add("--folder=\"$folderUUID\"")
-                logger.info("Using folder UUID: $folderUUID")
+            // The password literal is the same for both branches; it must be
+            // single-quoted so the CLI doesn't try to expand $-prefixed chars.
+            val passwordField = "password='$password'"
+            val command = when (target) {
+                is GenerateTarget.Classic -> buildClassicAddCommand(title, passwordField, target.folderUuid)
+                is GenerateTarget.Drive -> buildDriveAddCommand(title, passwordField, target.folderUuid)
             }
-
-            cmdParts.add("password='$password'") // password must be single-quoted for CLI
-
-            val command = cmdParts.joinToString(" ")
-            logger.info("🔧 Running command: $command")
+            logger.info("Issuing ${command.substringBefore(' ')} (target=${if (target is GenerateTarget.Drive) "Drive" else "Classic"})")
             
             val output = KeeperCommandUtils.executeCommandWithRetry(
                 command,
@@ -220,15 +262,19 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
                     logLevel = KeeperCommandUtils.LogLevel.INFO,
                     validation = KeeperCommandUtils.ValidationConfig(
                         minLength = 10, // Should get some meaningful output
-                        customValidator = { output ->
-                            // Should contain a record UID pattern
-                            Regex("""[A-Za-z0-9_-]{22}""").containsMatchIn(output)
-                        }
+                        customValidator = { out ->
+                            val ok = KeeperRecordOutputValidators.isRecordAddSuccess(out)
+                            if (!ok) {
+                                logger.debug("Generate record-add validation failed for output: ${out.take(150)}...")
+                            }
+                            ok
+                        },
+                        fatalErrorDetector = KeeperRecordOutputValidators::isFatalError
                     )
                 ),
                 logger
             )
-            
+
             // Extract record UID from output
             extractRecordUidFromOutput(output)
             
@@ -236,6 +282,50 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
             logger.error("Record creation failed after retries", ex)
             throw ex
         }
+    }
+
+    /**
+     * Build the classic `record-add` command. The folder UUID is resolved
+     * upstream by [KeeperRecordTargetPrompt] (with the project-scope vs
+     * app-scope fallback and the "Pick Folder First" UX); this builder
+     * just consumes the value. `null` / blank means "create at the
+     * Classic Vault root" — no `--folder` flag emitted.
+     */
+    private fun buildClassicAddCommand(title: String, passwordField: String, classicFolderUuid: String?): String {
+        val parts = mutableListOf(
+            "record-add",
+            "--title=\"$title\"",
+            "--record-type=login"
+        )
+        if (!classicFolderUuid.isNullOrBlank()) {
+            parts.add("--folder=\"$classicFolderUuid\"")
+            logger.info("Using classic folder UUID: $classicFolderUuid")
+        } else {
+            logger.info("No classic folder UUID set; record will be created at the vault root")
+        }
+        parts.add(passwordField)
+        return parts.joinToString(" ")
+    }
+
+    /**
+     * Build the `nsf-record-add` command. `nsf-*` commands use space-separated
+     * flag form per the Nested Shared Folders docs; the field literal still
+     * uses the shared `field=value` syntax.
+     */
+    private fun buildDriveAddCommand(title: String, passwordField: String, driveFolderUuid: String?): String {
+        val parts = mutableListOf(
+            "nsf-record-add",
+            "--title", "\"$title\"",
+            "--record-type", "login"
+        )
+        if (!driveFolderUuid.isNullOrBlank()) {
+            parts += listOf("--folder", "\"$driveFolderUuid\"")
+            logger.info("Using Nested Shared Folder UUID: $driveFolderUuid")
+        } else {
+            logger.info("Creating Nested Shared record at the Nested Shared Folder root (no folder UUID set)")
+        }
+        parts.add(passwordField)
+        return parts.joinToString(" ")
     }
 
     /**

@@ -193,6 +193,15 @@ tasks.test {
     include("**/KeeperRecordUpdateActionTest*")
     include("**/KeeperSecretActionTest*")
     include("**/KeeperAuthActionTest*")
+    // Nested Shared Folders coverage (those flows are folded into the unified
+    // KeeperFolderSelectAction / KeeperGetSecretAction tests above; the
+    // shared validator + target-prompt suites are independent and stay).
+    include("**/KeeperRecordOutputValidatorsTest*")
+    include("**/KeeperRecordTargetPromptTest*")
+    include("**/KeeperFolderValidatorTest*")
+    include("**/KeeperRecordValidatorTest*")
+    include("**/KeeperCliSafetyTest*")
+    include("**/KeeperEnvSafetyTest*")
 }
 
 intellijPlatformTesting {
