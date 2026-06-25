@@ -138,4 +138,54 @@ class KeeperActionTestSuite : BaseKeeperActionTest() {
             }
         }
     }
+
+    @Test
+    fun `test KeeperFolderSelectAction handles mixed-source folders without throwing`() {
+        // Unified picker should accept both Classic and Drive folders in
+        // the same listing — Commander's `ls --format=json -f -R` returns
+        // them together once Nested Shared Folders is enabled on the account.
+        MockKeeperService.addMockCommand(
+            "ls --format=json -f -R",
+            """
+            [
+                {"uid": "legacy-folder-uid", "name": "Legacy Folder", "source": "Legacy"},
+                {"uid": "drive-folder-uid",  "name": "Drive Folder",  "source": "KeeperDrive"}
+            ]
+            """.trimIndent()
+        )
+
+        val action = KeeperFolderSelectAction()
+        val event = createActionEventWithProjectOnly()
+
+        try {
+            action.actionPerformed(event)
+            assertTrue("Action should complete without throwing", true)
+        } catch (e: Exception) {
+            fail("Action should not throw exception: ${e.message}")
+        }
+    }
+
+    @Test
+    fun `test KeeperGetSecretAction handles mixed-source records without throwing`() {
+        MockKeeperService.addMockCommand(
+            "list --format json",
+            """
+            [
+                {"record_uid": "legacy-record-uid-1", "title": "Classic", "record_category": "Classic"},
+                {"record_uid": "drive-record-uid-12", "title": "Drive",   "record_category": "KeeperDrive"}
+            ]
+            """.trimIndent()
+        )
+
+        val action = KeeperGetSecretAction()
+        configureFileWithCaretAt("api_key = ", 9)
+        val event = createActionEventWithEditor()
+
+        try {
+            action.actionPerformed(event)
+            assertTrue("Action should complete without throwing", true)
+        } catch (e: Exception) {
+            fail("Action should not throw exception: ${e.message}")
+        }
+    }
 }

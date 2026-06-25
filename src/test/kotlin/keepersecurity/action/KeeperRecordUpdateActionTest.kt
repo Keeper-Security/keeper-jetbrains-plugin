@@ -80,6 +80,21 @@ class KeeperRecordUpdateActionTest {
         }
     }
 
+    @Test
+    fun `test action references the shared output validator helper`() {
+        // Inline validators were extracted into KeeperRecordOutputValidators
+        // so the same matching logic can run for both classic `record-update`
+        // and `nsf-record-update`. This is a class-level smoke check; the
+        // detailed behaviour lives in KeeperRecordOutputValidatorsTest.
+        val helperFqn = "keepersecurity.util.KeeperRecordOutputValidators"
+        try {
+            val cls = Class.forName(helperFqn)
+            assertNotNull("Helper should be loadable", cls)
+        } catch (ex: ClassNotFoundException) {
+            fail("Expected $helperFqn to be on the classpath: ${ex.message}")
+        }
+    }
+
     private fun getPrivateField(obj: Any, fieldName: String): Any? {
         val field = obj.javaClass.getDeclaredField(fieldName)
         field.isAccessible = true

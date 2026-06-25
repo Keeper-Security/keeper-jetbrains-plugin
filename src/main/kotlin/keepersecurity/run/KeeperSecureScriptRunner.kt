@@ -9,7 +9,9 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import keepersecurity.service.KeeperShellService
+import keepersecurity.util.KeeperCliSafety
 import keepersecurity.util.KeeperCommandUtils
+import keepersecurity.util.KeeperEnvSafety
 import keepersecurity.util.KeeperJsonUtils
 import keepersecurity.util.KeeperRecordFieldExtractor
 import java.io.File
@@ -55,7 +57,7 @@ object KeeperSecureScriptRunner {
         onProcessStarted: (Process) -> Unit = {},
     ): ExecutionResult {
         val errors = mutableListOf<String>()
-        val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]+)/field/(\S+)""")
+        val keeperPattern = Regex("""keeper://([A-Za-z0-9_-]{22})/field/(\S+)""")
         val keeperRefs = mutableListOf<Triple<String, String, String>>()
 
         try {
@@ -65,8 +67,21 @@ object KeeperSecureScriptRunner {
                 val (key, value) = parts.map { it.trim() }
                 val match = keeperPattern.matchEntire(value)
                 if (match != null) {
+                    KeeperEnvSafety.blockedEnvKeyReason(key)?.let { reason ->
+                        errors.add("Skipped $key: $reason")
+                        logger.warn("Blocked .env key '$key': $reason")
+                        return@forEach
+                    }
                     val uid = match.groupValues[1]
                     val field = match.groupValues[2]
+                    if (!KeeperCliSafety.isValidRecordUid(uid)) {
+                        errors.add(
+                            "Skipped $key: invalid Keeper record uid '$uid' in keeper:// notation " +
+                                "(expected exactly 22 characters: A-Z, a-z, 0-9, _, -)"
+                        )
+                        logger.warn("Invalid keeper:// UID for key '$key': '$uid'")
+                        return@forEach
+                    }
                     keeperRefs.add(Triple(key, uid, field))
                     logger.info("Found Keeper ref: $key -> keeper://$uid/field/$field")
                 }
@@ -77,7 +92,12 @@ object KeeperSecureScriptRunner {
         }
 
         if (keeperRefs.isEmpty()) {
-            logger.warn("No Keeper references found in .env file; running command with no secret injection")
+            val errorList = if (errors.isNotEmpty()) {
+                errors
+            } else {
+                listOf("No Keeper references found in .env file")
+            }
+            return ExecutionResult(0, errorList, "", -1)
         }
 
         val envVars = mutableMapOf<String, String>()
@@ -110,8 +130,16 @@ object KeeperSecureScriptRunner {
                     null
                 }
                 if (!secret.isNullOrEmpty()) {
-                    envVars[key] = secret
-                    logger.info("Injected: $key=****** (${secret.length} chars)")
+                    when (val verdict = KeeperEnvSafety.validateForInjection(key, secret)) {
+                        is KeeperEnvSafety.Verdict.Allowed -> {
+                            envVars[key] = verdict.value
+                            logger.info("Injected: $key=****** (${secret.length} chars)")
+                        }
+                        is KeeperEnvSafety.Verdict.Blocked -> {
+                            errors.add("Skipped $key: ${verdict.reason}")
+                            logger.warn("Blocked env injection for '$key': ${verdict.reason}")
+                        }
+                    }
                 } else {
                     errors.add("Field '$field' not found in Keeper record $uid")
                     logger.warn("Field '$field' not found in record $uid")
@@ -166,7 +194,9 @@ object KeeperSecureScriptRunner {
             pb.directory(fileParentDir)
 
             val env = pb.environment()
-            env.putAll(envVars)
+            val subprocessEnv = KeeperEnvSafety.buildSubprocessEnvironment(env, envVars, SystemInfo.isWindows)
+            env.clear()
+            env.putAll(subprocessEnv)
 
             logger.info("Running script with ${envVars.size} injected secrets")
             logger.info("Working directory: ${fileParentDir.absolutePath}")
@@ -233,6 +263,10 @@ object KeeperSecureScriptRunner {
     }
 
     private fun getKeeperJsonFromShell(uid: String, logger: Logger): String {
+        if (!KeeperCliSafety.isValidRecordUid(uid)) {
+            throw IllegalArgumentException("Invalid Keeper record uid: $uid")
+        }
+        KeeperCliSafety.requireSafe(uid, "record uid")
         val output = KeeperCommandUtils.executeCommandWithRetry(
             "get $uid --format json",
             KeeperCommandUtils.Presets.jsonObject(maxRetries = 3),
