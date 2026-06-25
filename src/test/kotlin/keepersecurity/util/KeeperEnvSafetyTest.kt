@@ -71,7 +71,11 @@ class KeeperEnvSafetyTest {
     }
 
     @Test fun `blockedEnvKeyReason rejects preserved system keys`() {
-        listOf("PATH", "HOME", "USER", "SHELL").forEach { key ->
+        listOf(
+            "PATH", "HOME", "USER", "SHELL",
+            "LANG", "LC_ALL", "TMPDIR",
+            "USERPROFILE", "TEMP", "TMP", "COMSPEC",
+        ).forEach { key ->
             assertTrue(KeeperEnvSafety.blockedEnvKeyReason(key)!!.contains("blocked"))
         }
     }

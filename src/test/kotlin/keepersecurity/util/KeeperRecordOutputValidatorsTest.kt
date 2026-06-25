@@ -69,7 +69,7 @@ class KeeperRecordOutputValidatorsTest {
     @Test
     fun `nsf-record-add rejects aborted output (no -f)`() {
         val output =
-            "Warning: attachment fields are not supported in nsf-record-add; Aborted"
+            "Warning: fields not supported; Aborted\nCreated record abc123def456GHI789jkLM"
         assertFalse(KeeperRecordOutputValidators.isRecordAddSuccess(output))
     }
 
