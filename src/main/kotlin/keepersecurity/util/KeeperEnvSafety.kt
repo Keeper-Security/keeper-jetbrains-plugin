@@ -24,19 +24,25 @@ object KeeperEnvSafety {
             "Interpreter hook variables (NODE_OPTIONS, LD_PRELOAD, PYTHONPATH, etc.) " +
             "are blocked automatically."
 
-    private val EXACT_BLOCKED_KEYS = setOf(
+        private val EXACT_BLOCKED_KEYS = setOf(
         "BASH_ENV",
         "BROWSER",
+        "COMSPEC",
         "EDITOR",
         "ENV",
         "GIT_EXTERNAL_DIFF",
         "GIT_SSH_COMMAND",
+        "HOME",
         "JAVA_TOOL_OPTIONS",
+        "LANG",
+        "LC_ALL",
         "LD_LIBRARY_PATH",
         "LD_PRELOAD",
         "MANPAGER",
         "NODE_OPTIONS",
+        "NODE_OPTS",
         "PAGER",
+        "PATH",
         "PERL5OPT",
         "PROMPT_COMMAND",
         "PS0",
@@ -46,6 +52,12 @@ object KeeperEnvSafety {
         "PYTHONPATH",
         "PYTHONSTARTUP",
         "RUBYOPT",
+        "SHELL",
+        "TEMP",
+        "TMP",
+        "TMPDIR",
+        "USER",
+        "USERPROFILE",
         "VISUAL",
         "_JAVA_OPTIONS",
     )

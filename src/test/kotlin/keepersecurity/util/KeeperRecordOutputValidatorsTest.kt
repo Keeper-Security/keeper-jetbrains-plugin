@@ -35,6 +35,15 @@ class KeeperRecordOutputValidatorsTest {
     }
 
     @Test
+    fun `nsf-record-add accepts advisory warning alongside success UID`() {
+        val output = """
+            Warning: optional advisory line
+            Created Nested Shared record abc123def456GHI789jkLM
+        """.trimIndent()
+        assertTrue(KeeperRecordOutputValidators.isRecordAddSuccess(output))
+    }
+
+    @Test
     fun `record-add rejects empty output`() {
         assertFalse(KeeperRecordOutputValidators.isRecordAddSuccess(""))
     }
@@ -58,9 +67,9 @@ class KeeperRecordOutputValidatorsTest {
     }
 
     @Test
-    fun `nsf-record-add rejects warning-aborted output (no -f)`() {
+    fun `nsf-record-add rejects aborted output (no -f)`() {
         val output =
-            "Warning: attachment fields are not supported in nsf-record-add; rerun with -f to skip"
+            "Warning: fields not supported; Aborted\nCreated record abc123def456GHI789jkLM"
         assertFalse(KeeperRecordOutputValidators.isRecordAddSuccess(output))
     }
 
@@ -116,9 +125,9 @@ class KeeperRecordOutputValidatorsTest {
     }
 
     @Test
-    fun `record-update rejects warning prefix from nsf-record-add style abort`() {
+    fun `record-update accepts advisory warning without Aborted`() {
         val output = "Warning: unsupported field 'attachments'"
-        assertFalse(KeeperRecordOutputValidators.isRecordUpdateSuccess(output))
+        assertTrue(KeeperRecordOutputValidators.isRecordUpdateSuccess(output))
     }
 
     @Test
