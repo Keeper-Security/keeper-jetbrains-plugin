@@ -46,8 +46,8 @@ object KeeperRecordOutputValidators {
         "failed",
         "not found",
         // `nsf-record-add` aborts on attachment / unknown-field warnings unless
-        // `-f` is supplied; the abort line begins with "Warning:" or "Aborted".
-        "warning:",
+        // `-f` is supplied; the abort output includes "Aborted" (advisory "Warning:"
+        // lines alone are not treated as failures).
         "aborted",
         // Older Commander builds that pre-date Nested Shared Folders reject
         // the nsf-* namespace with one of these phrases.

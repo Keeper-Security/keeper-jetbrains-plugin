@@ -61,6 +61,21 @@ class KeeperEnvSafetyTest {
         assertEquals("NODE_OPTIONS", (verdict as KeeperEnvSafety.Verdict.Blocked).key)
     }
 
+    @Test fun `blockedEnvKeyReason rejects NODE_OPTS`() {
+        assertTrue(KeeperEnvSafety.blockedEnvKeyReason("NODE_OPTS")!!.contains("blocked"))
+    }
+
+    @Test fun `validateForInjection blocks NODE_OPTS payload`() {
+        val verdict = KeeperEnvSafety.validateForInjection("NODE_OPTS", "--require=./pwn.js")
+        assertTrue(verdict is KeeperEnvSafety.Verdict.Blocked)
+    }
+
+    @Test fun `blockedEnvKeyReason rejects preserved system keys`() {
+        listOf("PATH", "HOME", "USER", "SHELL").forEach { key ->
+            assertTrue(KeeperEnvSafety.blockedEnvKeyReason(key)!!.contains("blocked"))
+        }
+    }
+    
     @Test fun `validateForInjection allows normal DATABASE_URL injection`() {
         val verdict = KeeperEnvSafety.validateForInjection("DATABASE_URL", "postgres://localhost/db")
         assertTrue(verdict is KeeperEnvSafety.Verdict.Allowed)
