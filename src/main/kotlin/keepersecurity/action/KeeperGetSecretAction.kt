@@ -1,12 +1,10 @@
 package keepersecurity.action
 
-import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
@@ -330,23 +328,16 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
     }
 
     /**
-     * Detects HTTP Client request files via the FileType API. The `com.jetbrains.restClient`
-     * plugin is an optional dependency, so its classes are only on the classpath when it is
-     * loaded; the plugin check plus the try/catch keep the call safe on IDEs that do not bundle it.
+     * Detects JetBrains HTTP Client request files by extension. Avoids internal platform APIs
+     * (`PluginManagerCore`, `HttpRequestFileType`); the `$keeper` dynamic variable is registered
+     * only when the optional `com.jetbrains.restClient` dependency is loaded.
      */
     private fun isHttpClientRequestFile(editor: Editor): Boolean {
         val file: VirtualFile = FileDocumentManager.getInstance().getFile(editor.document) ?: return false
-        if (!isHttpClientPluginEnabled()) return false
-        return try {
-            file.fileType == com.intellij.httpClient.http.request.HttpRequestFileType.INSTANCE
-        } catch (_: Throwable) {
-            false
+        return when (file.extension?.lowercase()) {
+            "http", "rest" -> true
+            else -> false
         }
-    }
-
-    private fun isHttpClientPluginEnabled(): Boolean {
-        val descriptor = PluginManagerCore.getPlugin(PluginId.getId("com.jetbrains.restClient"))
-        return descriptor != null && descriptor.isEnabled
     }
 
     /**
