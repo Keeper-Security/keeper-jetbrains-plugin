@@ -4,6 +4,7 @@ import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationTypeBase
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RunConfigurationOptions
+import com.intellij.execution.configurations.RunConfigurationSingletonPolicy
 import com.intellij.openapi.project.Project
 import com.intellij.icons.AllIcons
 
@@ -27,6 +28,7 @@ class KeeperSecureRunConfigurationType : ConfigurationTypeBase(
 
         override fun getName(): String = "Run Keeper Securely"
 
-        override fun isConfigurationSingletonByDefault(): Boolean = false
+        override fun getSingletonPolicy(): RunConfigurationSingletonPolicy =
+            RunConfigurationSingletonPolicy.MULTIPLE_INSTANCE
     }
 }
