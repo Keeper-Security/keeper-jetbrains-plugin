@@ -1,4 +1,0 @@
-<idea-plugin>
-    <!-- Loaded only when the Python plugin is present. Run Keeper Securely defaults
-         use generic Sdk APIs from the main module; no Python-specific extensions here. -->
-</idea-plugin>

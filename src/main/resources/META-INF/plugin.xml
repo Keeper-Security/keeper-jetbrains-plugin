@@ -4,8 +4,6 @@
     <vendor email="ops@keepersecurity.com" url="https://www.keepersecurity.com">Keeper Security</vendor>
 
     <depends>com.intellij.modules.platform</depends>
-    <!-- Python: optional; enables reading project/module Python SDK for Run Keeper Securely defaults when PyCharm / Python plugin is present -->
-    <depends optional="true" config-file="keeper-python.xml">com.intellij.modules.python</depends>
     <!-- HTTP Client (Ultimate / WebStorm / etc.); optional so IC installs without it still load the plugin -->
     <depends optional="true" config-file="keeper-http-client.xml">com.jetbrains.restClient</depends>
 
