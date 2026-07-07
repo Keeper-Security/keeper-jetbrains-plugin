@@ -251,7 +251,7 @@ object KeeperListPickerDialog {
         }
 
         private fun nestedBadgeBackground(): Color =
-            JBUI.CurrentTheme.Link.linkColor().let { link ->
+            JBUI.CurrentTheme.Link.Foreground.ENABLED.let { link ->
                 Color(
                     (link.red + 255 * 4) / 5,
                     (link.green + 255 * 4) / 5,
@@ -260,6 +260,6 @@ object KeeperListPickerDialog {
                 )
             }
 
-        private fun nestedBadgeForeground(): Color = JBUI.CurrentTheme.Link.linkColor()
+        private fun nestedBadgeForeground(): Color = JBUI.CurrentTheme.Link.Foreground.ENABLED
     }
 }
