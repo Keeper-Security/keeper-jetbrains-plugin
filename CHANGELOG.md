@@ -14,6 +14,14 @@
 ### Fixed
 - **Commander compatibility** for current folder and record discriminators (`classic_folder` / `nested_share_folder`, `Classic` / `Nested`), with support for older wire values.
 
+## [2.0.2] - 2026-07-07
+
+### Fixed
+- Replaced internal `PluginManagerCore` API with public `PluginManager.isPluginInstalled()` for HTTP Client detection
+- Replaced deprecated `JBUI.CurrentTheme.Link.linkColor()` with `Link.Foreground.ENABLED`
+- Removed empty optional Python dependency declaration that had no runtime effect
+- Plugin now verifies compatibility against IntelliJ IDEA 2026.2 EAP (build 262.8665.81)
+
 ## [1.2.0] - 2026-06-22
 
 ### Added

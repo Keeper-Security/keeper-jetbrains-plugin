@@ -1,11 +1,11 @@
 package keepersecurity.action
 
+import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
-import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
@@ -330,11 +330,11 @@ class KeeperGetSecretAction : AnAction("Get Keeper Secret") {
     }
 
     /**
-    * Detects JetBrains HTTP Client request files by extension when the HTTP Client plugin is
-    * installed. Uses public [PluginManager.isPluginInstalled] (not Internal API
-    * [com.intellij.ide.plugins.PluginManagerCore.getPlugin]). The `$keeper` dynamic variable is
-    * registered only when optional `com.jetbrains.restClient` loads `keeper-http-client.xml`.
-    */
+     * Detects JetBrains HTTP Client request files by extension when the HTTP Client plugin is
+     * installed. Uses public [PluginManager.isPluginInstalled] (not Internal API
+     * [com.intellij.ide.plugins.PluginManagerCore.getPlugin]). The `$keeper` dynamic variable is
+     * registered only when optional `com.jetbrains.restClient` loads `keeper-http-client.xml`.
+     */
     private fun isHttpClientRequestFile(editor: Editor): Boolean {
         val file: VirtualFile = FileDocumentManager.getInstance().getFile(editor.document) ?: return false
         if (!isHttpClientPluginEnabled()) return false

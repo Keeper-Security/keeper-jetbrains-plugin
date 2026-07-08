@@ -5,12 +5,12 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     id("java") // Java support
-    id("org.jetbrains.kotlin.jvm") version "2.2.0" // Kotlin support
+    id("org.jetbrains.kotlin.jvm") version "2.4.0" // Kotlin support
     id("org.jetbrains.intellij.platform") version "2.7.0" // IntelliJ Platform Gradle Plugin
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0"
     id("org.jetbrains.changelog") version "2.3.0" // Gradle Changelog Plugin
     id("org.jetbrains.qodana") version "2025.1.1" // Gradle Qodana Plugin
-    id("org.jetbrains.kotlinx.kover") version "0.9.1" // Gradle Kover Plugin
+    id("org.jetbrains.kotlinx.kover") version "0.9.8" // Gradle Kover Plugin
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -121,9 +121,8 @@ intellijPlatform {
     pluginVerification {
         ides {
             ide(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
-            // Optionally verify against additional IDEs:
-            // ide("IC", "2024.3.6")
-            // ide("IU", "2024.3.6")
+            // Verify against the EAP build used by the JetBrains Marketplace live checker (build 262.8665.81 = IU 2026.2)
+            ide("IU", "262.8665.81")
         }
     }
 }
@@ -152,6 +151,16 @@ tasks {
 
     publishPlugin {
         dependsOn(patchChangelog)
+    }
+
+    // Activate the EAP trial widget so the IDE shows the same toolbar state the JetBrains
+    // Marketplace live checker uses (build IU-262.8665.81, eap.require.license=true).
+    // To test against 2026.2 EAP: set platformVersion=2026.2 in gradle.properties locally,
+    // then run ./gradlew runIde.
+    named<org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask>("runIde") {
+        jvmArgumentProviders += CommandLineArgumentProvider {
+            listOf("-Deap.require.license=true")
+        }
     }
 
     // Task to copy runtime dependencies for SBOM generation
