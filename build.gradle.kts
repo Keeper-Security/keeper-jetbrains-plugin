@@ -10,7 +10,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0"
     id("org.jetbrains.changelog") version "2.3.0" // Gradle Changelog Plugin
     id("org.jetbrains.qodana") version "2025.1.1" // Gradle Qodana Plugin
-    id("org.jetbrains.kotlinx.kover") version "0.9.1" // Gradle Kover Plugin
+    id("org.jetbrains.kotlinx.kover") version "0.9.8" // Gradle Kover Plugin
 }
 
 group = providers.gradleProperty("pluginGroup").get()
