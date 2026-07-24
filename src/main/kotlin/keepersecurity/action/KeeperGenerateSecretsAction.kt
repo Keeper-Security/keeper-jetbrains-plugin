@@ -243,9 +243,12 @@ class KeeperGenerateSecretsAction : AnAction("Keeper Generate Secrets") {
         project: Project
     ): String? {
         return try {
+            // Reject control characters before embedding so a malformed CLI
+            // password cannot split the persistent-shell write into extra commands.
+            val safePassword = KeeperCliSafety.requireSafe(password, "generated password")
             // The password literal is the same for both branches; it must be
             // single-quoted so the CLI doesn't try to expand $-prefixed chars.
-            val passwordField = "password='${KeeperCliSafety.escapeSingleQuoted(password)}'"
+            val passwordField = "password='${KeeperCliSafety.escapeSingleQuoted(safePassword)}'"
             val command = when (target) {
                 is GenerateTarget.Classic -> buildClassicAddCommand(title, passwordField, target.folderUuid)
                 is GenerateTarget.Drive -> buildDriveAddCommand(title, passwordField, target.folderUuid)

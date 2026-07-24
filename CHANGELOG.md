@@ -14,6 +14,11 @@
 ### Fixed
 - **Commander compatibility** for current folder and record discriminators (`classic_folder` / `nested_share_folder`, `Classic` / `Nested`), with support for older wire values.
 
+## [2.0.3] - 2026-07-23
+
+### Fixed
+- **Security (VM-1450 / CWE-78):** Reject `\r`, `\n`, and NUL in editor selection and related CLI inputs before piping to the persistent Keeper shell; escape quotes when embedding values in Commander commands; refuse multi-line writes at the shell boundary. Closes command injection via crafted Add Keeper Record selection (and the same pattern on Update / Generate). Update Record now also requires a valid 22-character record UID before lookup.
+
 ## [2.0.2] - 2026-07-07
 
 ### Fixed
