@@ -87,6 +87,14 @@ class KeeperRecordUpdateAction : AnAction("Update Keeper Record") {
             return
         }
 
+        if (!KeeperCliSafety.isValidRecordUid(recordUid)) {
+            showError(
+                "Record uid must be a 22-character Keeper UID (letters, digits, '_' or '-').",
+                project
+            )
+            return
+        }
+
         // Look up the UID in the vault to decide which CLI command to use.
         // `list --format json` includes a `record_category` discriminator
         // (`Classic` / `Nested`, plus older legacy wire values) that maps 1:1 onto

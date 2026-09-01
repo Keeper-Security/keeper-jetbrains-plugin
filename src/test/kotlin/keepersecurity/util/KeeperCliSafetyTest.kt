@@ -73,4 +73,46 @@ class KeeperCliSafetyTest {
     @Test fun `escapeSingleQuoted escapes embedded single quotes`() {
         assertEquals("it'\\''s", KeeperCliSafety.escapeSingleQuoted("it's"))
     }
+
+    // --- VM-1450: crafted editor selection / CLI injection regression shapes ---
+
+    @Test fun `requireSafe rejects Step-A shaped multi-line selection with quote break`() {
+        // Report Step A: close the field quote, inject a second Commander command, reopen.
+        val payload = "benign-value\"\nthis-device rename INJECTED\n\"end"
+        assertThrows(KeeperCliSafety.UnsafeCliInputException::class.java) {
+            KeeperCliSafety.requireSafe(payload, "selected text")
+        }
+    }
+
+    @Test fun `requireSafe rejects Step-B shaped multi-line selection with pam tunnel run`() {
+        val payload =
+            "benign-value\"\npam tunnel start abc123def456GHI789jkLM --run \"echo pwned\"\n\"end"
+        assertThrows(KeeperCliSafety.UnsafeCliInputException::class.java) {
+            KeeperCliSafety.requireSafe(payload, "selected text")
+        }
+    }
+
+    @Test fun `assertSingleLine rejects assembled record-add with injected second command`() {
+        val command =
+            "record-add --title=\"t\" --record-type=login password=\"benign-value\"\nthis-device rename INJECTED"
+        assertThrows(KeeperCliSafety.UnsafeCliInputException::class.java) {
+            KeeperCliSafety.assertSingleLine(command)
+        }
+    }
+
+    @Test fun `escapeDoubleQuoted prevents quote-break of field value`() {
+        val selection = "benign-value\""
+        val esc = KeeperCliSafety.escapeDoubleQuoted(selection)
+        assertEquals("benign-value\\\"", esc)
+        // After escaping, embedding inside double quotes must not prematurely close.
+        val field = "password=\"$esc\""
+        assertEquals("password=\"benign-value\\\"\"", field)
+        assertFalse(field.contains("password=\"benign-value\"\""))
+    }
+
+    @Test fun `isValidRecordUid rejects quote and metachar injection shapes`() {
+        assertFalse(KeeperCliSafety.isValidRecordUid("abc123def456GHI789jk\"M"))
+        assertFalse(KeeperCliSafety.isValidRecordUid("uid\" --folder=evil"))
+        assertFalse(KeeperCliSafety.isValidRecordUid("aaaaaaaaaaaaaaaaaaaaa\n"))
+    }
 }
