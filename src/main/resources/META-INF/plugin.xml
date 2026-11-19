@@ -14,6 +14,8 @@
         <projectActivity implementation="keepersecurity.service.KeeperStartupActivity" />
         <!-- Run | Edit Configurations → Run Keeper Securely -->
         <configurationType implementation="keepersecurity.run.KeeperSecureRunConfigurationType"/>
+        <!-- Balloons such as "Keeper CLI selected automatically" -->
+        <notificationGroup id="Keeper Security" displayType="BALLOON"/>
     </extensions>
 
     <actions>
@@ -30,6 +32,13 @@
                 class="keepersecurity.action.KeeperAuthAction"
                 text="Check Keeper Authorization"
                 description="Check if Keeper CLI is installed and you're logged in">
+                <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
+        </action>
+
+        <action id="keepersecurity.action.KeeperSwitchCliAction"
+                class="keepersecurity.action.KeeperSwitchCliAction"
+                text="Switch Keeper CLI"
+                description="Choose between Keeper Commander (keeper) and Keeper SMK (keeper-smk) installs">
                 <add-to-group group-id="KeeperVaultGroup" anchor="last"/>
         </action>
 
@@ -84,6 +93,11 @@
                     class="keepersecurity.action.KeeperAuthAction"
                     text="Check Keeper Auth"
                     description="Check Keeper authorization"/>
+
+            <action id="keepersecurity.action.KeeperSwitchCliActionEditor"
+                    class="keepersecurity.action.KeeperSwitchCliAction"
+                    text="Switch Keeper CLI"
+                    description="Choose between Keeper Commander and Keeper SMK"/>
                     
             <action id="keepersecurity.action.KeeperSecretActionEditor"
                     class="keepersecurity.action.KeeperSecretAction"

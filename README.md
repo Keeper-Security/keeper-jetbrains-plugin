@@ -47,6 +47,7 @@ The goal is to enable developers to manage secrets securely without leaving thei
 - **Keeper Commander CLI**: Must be installed and authenticated on your system
   - Download from [Keeper Commander Installation Guide](https://docs.keeper.io/commander/)
   - Authenticate using persistent login or biometric login
+  - **Keeper SMK** is supported too: if your deployment's Commander `setup.sh` installed `~/.keeper-smk/<host>/bin/keeper-smk`, the plugin finds it automatically (it doesn't need to be on PATH). See [Keeper Commander and Keeper SMK](#keeper-commander-and-keeper-smk).
   - **Nested Shared Folder** create/update flows need a recent Commander with `nsf-*` commands ([CLI reference](https://docs.keeper.io/keeperpam/commander-cli/command-reference/nested-shared-folder)). Run `pip install --upgrade keepercommander` if you see unknown `nsf-record-add` errors.
 - **Keeper Security Account**: Active subscription with vault access
 - **System Requirements**:
@@ -91,12 +92,29 @@ All Keeper actions are available through two locations:
 | Action | Description | Use Case |
 |--------|-------------|----------|
 | Check Keeper Authorization | Verify Keeper CLI installation and authentication | Troubleshoot connection issues |
+| Switch Keeper CLI | Choose between detected Keeper Commander (`keeper`) and Keeper SMK (`keeper-smk`) installs | Machines with more than one Commander or SMK server |
 | Get Keeper Secret | Insert existing secrets (Classic or Nested Shared) as references | Retrieve stored secrets without exposing values |
 | Add Keeper Record | Create new vault record from selected text | Replace hardcoded secrets with vault references |
 | Update Keeper Record | Update existing record by UID and replace text | Modify existing secret values |
 | Generate Keeper Secret | Generate secure passwords and store in vault | Create new secure credentials |
 | Get Keeper Folder | Select Classic or Nested Shared folder for this project | Choose storage location for new records |
 | Run Keeper Securely | Run a command with secrets from `.env` (Tools menu or saved run configuration) | Run applications or scripts with vault-backed env vars |
+
+### Keeper Commander and Keeper SMK
+
+The plugin works with either CLI, and with both on the same machine:
+
+| | Keeper Commander | Keeper SMK |
+|---|---|---|
+| Command | `keeper` | `keeper-smk` |
+| Where the plugin looks | PATH, `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`, Python `bin` dirs, `python -m keepercommander` | `~/.keeper-smk/<host>/bin/keeper-smk` for every `<host>` (any domain or `localhost`), plus PATH |
+| Login state | `~/.keeper` | `~/.keeper-smk/<host>/.keeper` (separate per server) |
+
+- **One CLI found**: it's used automatically.
+- **Several found**: the plugin uses Keeper SMK (first host alphabetically) and shows a notification. Pick a different one with `Tools → Keeper Vault → Switch Keeper CLI`. Your choice is remembered across restarts.
+- **Chosen CLI removed**: actions fail with a message that lists what was found instead. The plugin never silently switches to another CLI, because each one talks to a different server and vault.
+- **Switching** restarts the Keeper shell and clears saved folders, because they belong to the previous vault. Each CLI needs its own login, for example `~/.keeper-smk/<host>/bin/keeper-smk login` followed by `this-device persistent-login on`.
+- The flavor is decided by name and location (SMK's `--version` banner is identical to Commander's). A `keeper` symlink that points into `~/.keeper-smk/<host>/` counts as that SMK server, and it always runs through the host's `keeper-smk` wrapper.
 
 ### Command Details
 
@@ -274,7 +292,9 @@ If you encounter issues, enable detailed logging:
 **Solutions**:
 - Install Keeper Commander CLI following the [installation guide](https://docs.keeper.io/commander/)
 - Ensure CLI is accessible from your system PATH
-- Verify installation with `keeper --version` in terminal
+- Verify installation with `keeper --version` in terminal (Keeper SMK: `~/.keeper-smk/<host>/bin/keeper-smk --version`)
+- Keeper SMK doesn't need to be on PATH; it's found under `~/.keeper-smk/<host>/bin/`
+- If you see "The selected Keeper CLI is no longer available", run `Tools → Keeper Vault → Switch Keeper CLI`
 - Restart IDE after CLI installation
 
 #### 4. Authentication Failures

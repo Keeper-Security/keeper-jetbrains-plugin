@@ -211,6 +211,9 @@ tasks.test {
     include("**/KeeperRecordValidatorTest*")
     include("**/KeeperCliSafetyTest*")
     include("**/KeeperEnvSafetyTest*")
+    // Keeper Commander vs Keeper SMK CLI detection / selection
+    include("**/KeeperCliDetectorTest*")
+    include("**/KeeperCliSelectionTest*")
 }
 
 intellijPlatformTesting {

@@ -1,6 +1,9 @@
 package keepersecurity.service
 
 import com.intellij.openapi.diagnostic.Logger
+import keepersecurity.model.KeeperCliFlavor
+import keepersecurity.model.KeeperCliInstall
+import keepersecurity.util.KeeperCliDetector
 import keepersecurity.util.KeeperCliSafety
 import java.io.*
 import java.util.concurrent.CompletableFuture
@@ -53,10 +56,19 @@ object KeeperShellService {
     private val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
     private val isLinux = System.getProperty("os.name").lowercase().contains("linux")
     
-    // Store the working keeper CLI path or command
-    @Volatile private var keeperCliPath: String = "keeper"
-    @Volatile private var keeperIsModule: Boolean = false
-    
+    /**
+     * The CLI (Keeper Commander or Keeper SMK) the running shell was started with.
+     * Resolved on every shell start by [resolveActiveCli] and fixed for the life
+     * of that shell process. Null until the first start.
+     */
+    @Volatile private var activeCli: KeeperCliInstall? = null
+
+    /** The auto-pick notice is shown at most once per IDE session. */
+    private val autoPickNoticeShown = AtomicBoolean(false)
+
+    /** Set by the plugin layer to tell the user when an install was auto-picked from several. */
+    @Volatile var autoPickListener: ((picked: KeeperCliInstall, all: List<KeeperCliInstall>) -> Unit)? = null
+
     data class CommandExecution(
         val future: CompletableFuture<String>,
         val commandText: String,
@@ -72,244 +84,6 @@ object KeeperShellService {
     }
     
     /**
-     * Check if Keeper CLI is available on the system with comprehensive path checking
-     */
-    private fun isKeeperCLIAvailable(): Boolean {
-        logger.info("=== COMPREHENSIVE KEEPER CLI DETECTION ===")
-        
-        val startTime = System.currentTimeMillis()
-        val maxDetectionTime = 30_000L // 30 seconds max to prevent hanging
-        
-        try {
-            // Log environment info first
-            val username = System.getProperty("user.name") 
-            val userHome = System.getProperty("user.home")
-            val currentPath = System.getenv("PATH")
-            
-            logger.info("Username: $username")
-            logger.info("User home: $userHome") 
-            logger.info("Current PATH: ${currentPath?.take(300)}...")
-            
-            // Comprehensive list of paths where keeper might be installed
-            val directPaths = when {
-                isWindows -> listOf(
-                    "keeper",
-                    "keeper.exe",
-                    "C:\\Python39\\Scripts\\keeper.exe",
-                    "C:\\Python310\\Scripts\\keeper.exe", 
-                    "C:\\Python311\\Scripts\\keeper.exe",
-                    "C:\\Python312\\Scripts\\keeper.exe",
-                    "C:\\Users\\$username\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\keeper.exe",
-                    "C:\\Users\\$username\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\keeper.exe",
-                    "C:\\Users\\$username\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\keeper.exe",
-                    "C:\\Users\\$username\\AppData\\Roaming\\Python\\Python39\\Scripts\\keeper.exe",
-                    "C:\\Users\\$username\\AppData\\Roaming\\Python\\Python310\\Scripts\\keeper.exe"
-                )
-                isMacOS -> listOf(
-                    "keeper",
-                    "/usr/local/bin/keeper",
-                    "/opt/homebrew/bin/keeper",
-                    "/usr/bin/keeper",
-                    // Python user install paths - THIS IS WHERE YOUR KEEPER IS LIKELY LOCATED
-                    "/Users/$username/Library/Python/3.9/bin/keeper",
-                    "/Users/$username/Library/Python/3.10/bin/keeper", 
-                    "/Users/$username/Library/Python/3.11/bin/keeper",
-                    "/Users/$username/Library/Python/3.12/bin/keeper",
-                    "/Users/$username/.local/bin/keeper",
-                    // System Python framework paths
-                    "/Library/Frameworks/Python.framework/Versions/3.9/bin/keeper",
-                    "/Library/Frameworks/Python.framework/Versions/3.10/bin/keeper",
-                    "/Library/Frameworks/Python.framework/Versions/3.11/bin/keeper",
-                    "/Library/Frameworks/Python.framework/Versions/3.12/bin/keeper",
-                    // Homebrew Python paths
-                    "/opt/homebrew/opt/python@3.9/bin/keeper",
-                    "/opt/homebrew/opt/python@3.10/bin/keeper", 
-                    "/opt/homebrew/opt/python@3.11/bin/keeper",
-                    "/opt/homebrew/opt/python@3.12/bin/keeper"
-                )
-                isLinux -> listOf(
-                    "keeper",
-                    "/usr/local/bin/keeper",
-                    "/usr/bin/keeper",
-                    "/home/$username/.local/bin/keeper",
-                    "/opt/keeper/bin/keeper"
-                )
-                else -> listOf("keeper")
-            }
-            
-            logger.info("Testing ${directPaths.size} direct paths...")
-            
-            // Test direct executable paths with timeout protection
-            for (path in directPaths) {
-                if (System.currentTimeMillis() - startTime > maxDetectionTime) {
-                    logger.warn("CLI detection timeout after 30 seconds - aborting direct path tests")
-                    break
-                }
-                
-                if (testKeeperPath(path)) {
-                    keeperCliPath = path
-                    keeperIsModule = false
-                    logger.info("SUCCESS: Found Keeper CLI at direct path: $path")
-                    return true
-                }
-            }
-            
-            logger.info("Direct paths failed. Testing Python module execution...")
-            
-            // Test Python module execution as fallback
-            val pythonCommands = when {
-                isMacOS -> listOf(
-                    "python3 -m keepercommander",
-                    "python -m keepercommander",
-                    "/usr/bin/python3 -m keepercommander",
-                    "/opt/homebrew/bin/python3 -m keepercommander",
-                    "/Library/Frameworks/Python.framework/Versions/3.9/bin/python3 -m keepercommander",
-                    "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 -m keepercommander"
-                )
-                isWindows -> listOf(
-                    "python -m keepercommander",
-                    "python3 -m keepercommander", 
-                    "py -m keepercommander",
-                    "C:\\Python39\\python.exe -m keepercommander",
-                    "C:\\Python310\\python.exe -m keepercommander"
-                )
-                else -> listOf(
-                    "python3 -m keepercommander",
-                    "python -m keepercommander"
-                )
-            }
-            
-            for (cmd in pythonCommands) {
-                if (System.currentTimeMillis() - startTime > maxDetectionTime) {
-                    logger.warn("CLI detection timeout - aborting Python module tests")
-                    break
-                }
-                
-                if (testKeeperPythonModule(cmd)) {
-                    keeperCliPath = cmd
-                    keeperIsModule = true
-                    logger.info("SUCCESS: Found Keeper via Python module: $cmd")
-                    return true
-                }
-            }
-            
-            // Final attempt: use system commands to locate keeper
-            logger.info("Python modules failed. Trying system locate commands...")
-            if (trySystemLocate()) {
-                return true
-            }
-            
-            logger.error("=== ALL KEEPER CLI DETECTION METHODS FAILED ===")
-            logDiagnosticInfo()
-            return false
-            
-        } catch (e: Exception) {
-            logger.error("CLI detection failed with exception", e)
-            return false
-        }
-    }
-    
-    /**
-     * Test a direct keeper executable path
-     */
-    private fun testKeeperPath(path: String): Boolean {
-        return try {
-            logger.info("Testing direct path: '$path'")
-            
-            val process = ProcessBuilder(path, "--version")
-                .redirectErrorStream(true)
-                .start()
-            
-            val completed = process.waitFor(5, TimeUnit.SECONDS)
-            val output = if (completed) {
-                process.inputStream.bufferedReader().readText()
-            } else {
-                logger.warn("Path '$path' timed out after 5 seconds")
-                process.destroyForcibly()
-                return false
-            }
-            
-            val exitCode = process.exitValue()
-            logger.info("Path '$path' - Exit code: $exitCode, Output: ${output.take(100)}")
-            
-            exitCode == 0 && output.contains("Keeper Commander", ignoreCase = true)
-            
-        } catch (e: Exception) {
-            logger.debug("Path '$path' failed: ${e.message}")
-            false
-        }
-    }
-    
-    /**
-     * Test Python module execution
-     */
-    private fun testKeeperPythonModule(command: String): Boolean {
-        return try {
-            logger.info("Testing Python module: '$command'")
-            
-            val parts = "$command --version".split(" ")
-            val process = ProcessBuilder(parts).start()
-            
-            val completed = process.waitFor(5, TimeUnit.SECONDS)
-            val output = if (completed) {
-                process.inputStream.bufferedReader().readText()
-            } else {
-                logger.warn("Python command '$command' timed out after 5 seconds")
-                process.destroyForcibly() 
-                return false
-            }
-            
-            val exitCode = process.exitValue()
-            logger.info("Python module '$command' - Exit code: $exitCode, Output: ${output.take(100)}")
-            
-            exitCode == 0 && output.contains("Keeper Commander", ignoreCase = true)
-            
-        } catch (e: Exception) {
-            logger.debug("Python command '$command' failed: ${e.message}")
-            false
-        }
-    }
-    
-    /**
-     * Try using system commands to locate keeper
-     */
-    private fun trySystemLocate(): Boolean {
-        val locateCommand = if (isWindows) "where" else "which"
-        return try {
-            logger.info("Trying system locate: '$locateCommand keeper'")
-            
-            val process = ProcessBuilder(locateCommand, "keeper").start()
-            val completed = process.waitFor(5, TimeUnit.SECONDS)
-            
-            if (!completed) {
-                logger.warn("System locate command timed out")
-                process.destroyForcibly()
-                return false
-            }
-            
-            val output = process.inputStream.bufferedReader().readText()
-            val exitCode = process.exitValue()
-            
-            if (exitCode == 0 && output.isNotBlank()) {
-                val foundPath = output.trim().lines().first()
-                logger.info("System locate found: $foundPath")
-                
-                if (testKeeperPath(foundPath)) {
-                    keeperCliPath = foundPath
-                    keeperIsModule = false
-                    logger.info("SUCCESS: Verified keeper at system located path: $foundPath")
-                    return true
-                }
-            }
-            
-            false
-        } catch (e: Exception) {
-            logger.debug("System locate failed: ${e.message}")
-            false
-        }
-    }
-    
-    /**
      * Log comprehensive diagnostic information
      */
     private fun logDiagnosticInfo() {
@@ -319,20 +93,63 @@ object KeeperShellService {
         logger.error("Home: ${System.getProperty("user.home")}")
         logger.error("Working Dir: ${System.getProperty("user.dir")}")
         logger.error("Java Version: ${System.getProperty("java.version")}")
-        
-        val path = System.getenv("PATH")
-        logger.error("PATH: $path")
-        
-        // Check if the expected keeper path exists as a file
-        val expectedPath = "/Users/${System.getProperty("user.name")}/Library/Python/3.9/bin/keeper"
-        val keeperFile = File(expectedPath)
-        logger.error("Expected keeper file exists: ${keeperFile.exists()}")
-        if (keeperFile.exists()) {
-            logger.error("Expected keeper file executable: ${keeperFile.canExecute()}")
-            logger.error("Expected keeper file readable: ${keeperFile.canRead()}")
+        logger.error("PATH: ${System.getenv("PATH")}")
+        val smkRoot = File(System.getProperty("user.home"), KeeperCliFlavor.SMK_ROOT_DIR_NAME)
+        logger.error("SMK root ${smkRoot.path} exists: ${smkRoot.isDirectory}" +
+            (smkRoot.list()?.let { " (hosts: ${it.joinToString()})" } ?: ""))
+    }
+
+    /** Every working Keeper Commander / Keeper SMK CLI on this machine (runs `--version` on each). */
+    fun detectInstalls(): List<KeeperCliInstall> = KeeperCliDetector.forCurrentSystem().detectAll()
+
+    /** The CLI the current (or last) shell was started with, or null if none has started yet. */
+    fun getActiveCli(): KeeperCliInstall? = activeCli
+
+    /**
+     * Detects installs and applies [KeeperCliSelection] rules.
+     * Throws [RuntimeException] with a user-facing message if nothing usable is found.
+     */
+    private fun resolveActiveCli(): KeeperCliInstall {
+        val installs = detectInstalls()
+        return when (val resolution = KeeperCliSelection.resolve(installs, KeeperCliSelection.loadSaved())) {
+            is KeeperCliSelection.Resolution.Active -> {
+                if (resolution.autoPickedFromMany && autoPickNoticeShown.compareAndSet(false, true)) {
+                    runCatching { autoPickListener?.invoke(resolution.install, installs) }
+                        .onFailure { logger.warn("Auto-pick notice failed", it) }
+                }
+                resolution.install
+            }
+            is KeeperCliSelection.Resolution.SavedMissing -> {
+                val savedName = resolution.saved.label ?: resolution.saved.id
+                val others = if (resolution.available.isEmpty()) "No other Keeper CLI was found."
+                    else "Found instead:\n" + resolution.available.joinToString("\n") { "  - ${it.displayLabel()}: ${it.path}" }
+                throw RuntimeException(
+                    "The selected Keeper CLI is no longer available:\n  $savedName\n  (${resolution.saved.id})\n\n" +
+                        "$others\n\nUse Tools > Keeper Vault > Switch Keeper CLI to choose another one."
+                )
+            }
+            KeeperCliSelection.Resolution.NoneFound -> {
+                logDiagnosticInfo()
+                throw RuntimeException(getKeeperCLIMissingMessage())
+            }
         }
     }
-    
+
+    /**
+     * Makes [install] the CLI to use and stops the running shell, so the next
+     * Keeper action starts a fresh shell with it. Waits for any in-flight
+     * command to finish first.
+     */
+    fun switchCli(install: KeeperCliInstall) {
+        KeeperCliSelection.save(install)
+        commandLock.withLock {
+            if (process != null) stopShell() else cleanup()
+            activeCli = null
+            authRequired.set(false)
+        }
+        logger.info("Switched Keeper CLI to ${install.displayLabel()} at ${install.path}")
+    }
+
     /**
      * Get detailed error message for missing Keeper CLI
      */
@@ -401,7 +218,10 @@ object KeeperShellService {
                 
                 If Keeper CLI is already installed, try running IDE from terminal
             """.trimIndent()
-        } + "\n\nThen run 'keeper login' to authenticate."
+        } + "\n\nUsing Keeper SMK? Run your deployment's Commander setup.sh installer. It installs " +
+            "~/${KeeperCliFlavor.SMK_ROOT_DIR_NAME}/<host>/bin/keeper-smk, which the plugin finds " +
+            "automatically (it doesn't need to be on PATH).\n\n" +
+            "Then run 'keeper login' (or 'keeper-smk login' for SMK) to authenticate."
     }
     
     /**
@@ -450,12 +270,15 @@ object KeeperShellService {
         
         try {
             // Check if Keeper CLI is available first
-            if (!isKeeperCLIAvailable()) {
-                val errorMessage = getKeeperCLIMissingMessage()
-                logger.error(errorMessage)
-                throw RuntimeException(errorMessage)
+            val cli = try {
+                resolveActiveCli()
+            } catch (e: RuntimeException) {
+                logger.warn(e.message ?: "No usable Keeper CLI")
+                throw e
             }
-            
+            activeCli = cli
+            logger.info("Using ${cli.displayLabel()} at ${cli.path}")
+
             // Better logging for first-time vs restart
             if (firstStart.get()) {
                 logger.info("Starting Keeper shell on first use (user action triggered)")
@@ -464,17 +287,10 @@ object KeeperShellService {
                 logger.info("Restarting Keeper shell")
             }
             
-            // Create process based on detection results
-            val processBuilder = if (keeperIsModule) {
-                // Python module command like "python3 -m keepercommander shell"
-                val parts = keeperCliPath.split(" ").toMutableList()
-                parts.add("shell")
-                ProcessBuilder(parts)
-            } else {
-                // Direct executable like "/usr/local/bin/keeper shell"
-                ProcessBuilder(keeperCliPath, "shell")
-            }
-            
+            // e.g. "/usr/local/bin/keeper shell", "~/.keeper-smk/<host>/bin/keeper-smk shell",
+            // or "python3 -m keepercommander shell"
+            val processBuilder = ProcessBuilder(cli.commandLine("shell"))
+
             logger.info("Starting process: ${processBuilder.command().joinToString(" ")}")
 
             // Disable colorized output to avoid ANSI artifacts in parsed JSON
@@ -955,15 +771,8 @@ object KeeperShellService {
 
     @Suppress("unused")
     private fun buildExternalKeeperCommand(vararg args: String): List<String> {
-        return if (keeperIsModule) {
-            // Example: "python3 -m keepercommander biometric --status"
-            val parts = keeperCliPath.split(" ").toMutableList()
-            parts.addAll(args)
-            parts
-        } else {
-            // Example: "/usr/local/bin/keeper biometric --status"
-            listOf(keeperCliPath) + args
-        }
+        // Example: "<active cli> biometric --status"
+        return activeCli?.commandLine(*args) ?: (listOf("keeper") + args)
     }
 
     @Suppress("unused")

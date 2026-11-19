@@ -5,11 +5,15 @@
 ### Added
 - **Nested Shared Folder support** across *Get Keeper Folder*, *Get Keeper Secret*, *Add Keeper Record*, *Update Keeper Record*, and *Generate Keeper Secret*. The plugin routes to Classic (`record-*`) or Nested Shared (`nsf-*`) commands based on vault metadata.
 - **Searchable folder and record picker** with **Classic** / **Nested** badges on each row.
+- **Keeper SMK support**: the plugin detects Keeper SMK's `~/.keeper-smk/<host>/bin/keeper-smk` (any enterprise domain or `localhost`) alongside Keeper Commander's `keeper`, without needing it on PATH.
+- **Switch Keeper CLI** action (Tools menu and editor popup) to choose between detected Keeper Commander and Keeper SMK installs. The choice persists, and switching restarts the shell and clears saved folders from the previous vault.
 
 ### Changed
 - **Get Keeper Folder** and **Get Keeper Secret** now include Nested Shared folders and records alongside Classic ones.
 - **Update Keeper Record** validates the record UID and chooses `record-update` vs `nsf-record-update` automatically.
 - **Run Keeper Securely** validates `keeper://` record UIDs and hardens environment injection from resolved secrets.
+- **Check Keeper Authorization** shows which CLI is in use (flavor, SMK host, version, path), and login hints use that CLI's command.
+- Keeper CLI detection moved out of `KeeperShellService` into `KeeperCliDetector`. Duplicate installs are merged by resolved symlink path.
 
 ### Fixed
 - **Commander compatibility** for current folder and record discriminators (`classic_folder` / `nested_share_folder`, `Classic` / `Nested`), with support for older wire values.

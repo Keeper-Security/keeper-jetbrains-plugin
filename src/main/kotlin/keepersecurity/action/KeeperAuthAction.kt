@@ -31,6 +31,16 @@ private enum class ProbeResult { AUTHENTICATED, NOT_LOGGED_IN, FAILED }
 class KeeperAuthAction : AnAction("Check Keeper Authorization") {
     private val logger = thisLogger()
 
+    /** Which CLI (Keeper Commander or Keeper SMK + host) the shell is using, for the dialogs below. */
+    private fun cliSummary(): String {
+        val cli = KeeperShellService.getActiveCli() ?: return ""
+        return "\n\nCLI in use: ${cli.displayLabel()}\n${cli.path}\n" +
+            "To use a different install: Tools > Keeper Vault > Switch Keeper CLI."
+    }
+
+    /** `keeper`, or the full SMK wrapper path (it's usually not on PATH). */
+    private fun loginCommand(): String = KeeperShellService.getActiveCli()?.terminalCommand() ?: "keeper"
+
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project = e.project ?: return
 
@@ -56,14 +66,16 @@ class KeeperAuthAction : AnAction("Check Keeper Authorization") {
                                 "Keeper Commander is asking for a master password, " +
                                 "but the plugin can't supply one over a piped shell.\n\n" +
                                 "Open a terminal and run:\n" +
-                                "    keeper login --persistent\n\n" +
+                                "    ${loginCommand()} login --persistent\n\n" +
                                 "Once you're logged in there (and Persistent Login is " +
-                                "enabled on your account), come back and try this action again."
+                                "enabled on your account), come back and try this action again." +
+                                cliSummary()
                             )
                         } else {
                             "Authorization Failed" to (
                                 "Failed to start Keeper shell.\n" +
-                                "Please check that Keeper CLI is installed and you're authenticated."
+                                "Please check that Keeper CLI is installed and you're authenticated." +
+                                cliSummary()
                             )
                         }
                         ApplicationManager.getApplication().invokeLater {
@@ -156,7 +168,7 @@ class KeeperAuthAction : AnAction("Check Keeper Authorization") {
                                 "Keeper shell is ready and authenticated."
                             }
                             ApplicationManager.getApplication().invokeLater {
-                                Messages.showInfoMessage(project, msg, "Authorization Check")
+                                Messages.showInfoMessage(project, msg + cliSummary(), "Authorization Check")
                             }
                         }
                         ProbeResult.NOT_LOGGED_IN -> {
@@ -166,8 +178,8 @@ class KeeperAuthAction : AnAction("Check Keeper Authorization") {
                                 Messages.showErrorDialog(
                                     project,
                                     "Keeper shell is running but you are not logged in.\n\n" +
-                                        "Please run `keeper login` in a terminal once to establish a " +
-                                        "persistent session, then try this action again.",
+                                        "Please run `${loginCommand()} login` in a terminal once to establish a " +
+                                        "persistent session, then try this action again." + cliSummary(),
                                     "Not Logged In to Keeper"
                                 )
                             }
@@ -184,7 +196,7 @@ class KeeperAuthAction : AnAction("Check Keeper Authorization") {
                             ApplicationManager.getApplication().invokeLater {
                                 Messages.showErrorDialog(
                                     project,
-                                    "Keeper shell did not report a logged-in state.\n\n$detail",
+                                    "Keeper shell did not report a logged-in state.\n\n$detail" + cliSummary(),
                                     "Authorization Not Confirmed"
                                 )
                             }
