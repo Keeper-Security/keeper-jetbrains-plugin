@@ -5,6 +5,8 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.project.Project
@@ -36,9 +38,15 @@ object KeeperCliNotifications {
                 .addAction(NotificationAction.createSimpleExpiring("Switch Keeper CLI...") {
                     val action = ActionManager.getInstance().getAction(SWITCH_CLI_ACTION_ID)
                         ?: return@createSimpleExpiring
-                    ActionUtil.invokeAction(
-                        action, SimpleDataContext.getProjectContext(project), ActionPlaces.NOTIFICATION, null, null
+                    val event = AnActionEvent.createEvent(
+                        action,
+                        SimpleDataContext.getProjectContext(project),
+                        action.templatePresentation.clone(),
+                        ActionPlaces.NOTIFICATION,
+                        ActionUiKind.NONE,
+                        null,
                     )
+                    ActionUtil.invokeAction(action, event, null)
                 })
                 .notify(null)
         }
