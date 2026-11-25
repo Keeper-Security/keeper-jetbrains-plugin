@@ -211,6 +211,16 @@ object KeeperRecordTargetPrompt {
     }
 
     /**
+     * Forget both saved folders (Classic and Nested Shared) for [project].
+     * Called when the user switches Keeper CLI, because folder UIDs from one
+     * vault/server mean nothing in another.
+     */
+    fun clearSavedFolders(project: Project) {
+        clearClassicFolder(project)
+        clearDriveFolder(project)
+    }
+
+    /**
      * Wipe the classic folder slot from both the project-scope and the
      * legacy application-scope `PropertiesComponent`. The app-scope clear
      * mirrors the dual-read in [readSavedClassicFolder] so a stale legacy

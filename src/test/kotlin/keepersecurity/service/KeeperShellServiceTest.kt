@@ -22,6 +22,12 @@ class KeeperShellServiceTest {
     }
     
     @Test
+    fun `test getActiveCli is null when no shell has started`() {
+        // No test starts a real shell, so no CLI is ever resolved.
+        assertNull("No CLI should be resolved before a shell starts", KeeperShellService.getActiveCli())
+    }
+
+    @Test
     fun `test isReady returns false when shell not started`() {
         assertFalse("Shell should not be ready when not started", KeeperShellService.isReady())
     }

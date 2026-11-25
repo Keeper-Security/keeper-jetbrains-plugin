@@ -4,6 +4,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
+import keepersecurity.ui.KeeperCliNotifications
 
 /**
  * Application-level service that manages the Keeper shell lifecycle
@@ -38,5 +39,8 @@ class KeeperStartupActivity : ProjectActivity {
         logger.info("Keeper plugin ready for project: ${project.name} (shell will start when needed)")
         // Just ensure service is registered, don't start shell
         com.intellij.openapi.components.service<KeeperPluginService>()
+
+        // Tell the user (once per session) when a CLI was auto-picked from several.
+        KeeperCliNotifications.install(project)
     }
 }
