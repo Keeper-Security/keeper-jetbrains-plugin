@@ -148,7 +148,7 @@ class KeeperCliDetector(
         /** Detector configured for the machine the IDE runs on. */
         fun forCurrentSystem(): KeeperCliDetector = KeeperCliDetector(currentEnvironment())
 
-        internal fun currentEnvironment(): Environment {
+        private fun currentEnvironment(): Environment {
             val osName = System.getProperty("os.name").lowercase()
             val isWindows = osName.contains("windows")
             val isMacOS = osName.contains("mac")

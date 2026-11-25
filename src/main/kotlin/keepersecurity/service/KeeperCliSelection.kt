@@ -21,8 +21,8 @@ import keepersecurity.model.KeeperCliInstall
  * recomputed on every shell start.
  */
 object KeeperCliSelection {
-    const val PREF_SELECTED_ID = "keeper.cli.selected.id"
-    const val PREF_SELECTED_LABEL = "keeper.cli.selected.label"
+    private const val PREF_SELECTED_ID = "keeper.cli.selected.id"
+    private const val PREF_SELECTED_LABEL = "keeper.cli.selected.label"
 
     data class Saved(val id: String, val label: String?)
 

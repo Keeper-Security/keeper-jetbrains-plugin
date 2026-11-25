@@ -30,7 +30,7 @@ class KeeperSwitchCliAction : AnAction("Switch Keeper CLI") {
 
         object : Task.Backgroundable(project, "Detecting Keeper CLIs...", false) {
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Looking for Keeper Commander and Keeper SMK..."
+                indicator.text = "Looking for installed Keeper CLIs..."
                 val installs = try {
                     KeeperShellService.detectInstalls()
                 } catch (ex: Exception) {

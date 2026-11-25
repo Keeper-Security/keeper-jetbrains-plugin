@@ -12,7 +12,7 @@ package keepersecurity.model
  *
  * Both print the same `--version` banner ("Keeper Commander, version X") and expose
  * the same shell, so the flavor is decided by executable name and install location
- * (see [KeeperCliDetector]), never by version text.
+ * (see [keepersecurity.util.KeeperCliDetector]), never by version text.
  */
 enum class KeeperCliFlavor(val displayName: String, val baseName: String) {
     COMMANDER("Keeper Commander", "keeper"),
@@ -47,7 +47,7 @@ data class KeeperCliInstall(
     val isModule: Boolean = false,
     val smkHost: String? = null,
 ) {
-    /** Stable identity used to persist the user's choice (see [KeeperCliSelection]). */
+    /** Stable identity used to persist the user's choice (see [keepersecurity.service.KeeperCliSelection]). */
     val id: String get() = if (isModule) "module:$path" else canonicalPath
 
     /** Full argv for running this CLI with [args]. */
